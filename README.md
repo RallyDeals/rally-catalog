@@ -40,7 +40,7 @@ rally-catalog/
     │   │   ├── dto/                             # request/response records (PageResponse, ...)
     │   │   ├── entity/                          # Category, Product, ProductStatus
     │   │   ├── exception/GoneException.java     # 410 for soft-deleted product re-delete
-    │   │   ├── repository/                      # JPA repos (incl. native search query)
+    │   │   ├── repository/                      # JPA repos + ProductSpecifications (Criteria API, no SQL strings)
     │   │   └── service/                         # ProductService, CategoryService (business rules)
     │   └── resources/
     │       ├── application.yml
@@ -59,7 +59,7 @@ rally-catalog/
 | Category CRUD | Done | create/list/get/update/delete; duplicate name → 400; delete-with-products → 400 |
 | Product create / update / soft delete | Done | status transitions, ownership checks, validation |
 | Product moderation | Done | `PENDING_APPROVAL → APPROVED / REJECTED`, re-approve/re-reject → 400, rejected-resubmit → pending |
-| Buyer browse/search | Done | full-text `q`, `categoryId` / `sellerId` / price filters, `sort` (`createdAt`/`basePrice`/`name`), pagination |
+| Buyer browse/search | Done | keyword `q` (LIKE on name/description), `categoryId` / `sellerId` / price filters, `sort` (`createdAt`/`basePrice`/`name`), pagination |
 | Role-based visibility | Done | buyer sees only APPROVED + non-deleted; owner/admin see everything; non-owner `GET /products/{id}` → 404 |
 | `POST /products/lookup` | Done | used by Order Service checkout; `found`/`notFound` split; empty/>50 → 400 |
 | Seed data | Done | 24 real demo products across 6 categories (V2 migration) |
@@ -221,3 +221,8 @@ From `gaps-and-solutions.md` and a spec-vs-implementation review of
 5. **Schema deviation** — `id`/`seller_id`/`category_id` use `VARCHAR(36)` (String
    ids with `GenerationType.UUID`) instead of the native `uuid` type in the spec's
    SQL. Invisible at the API level.
+6. **Search is LIKE-based, not Postgres full-text** — all queries are built with
+   the JPA Criteria API (`ProductSpecifications`), so `q` matches `name`/`description`
+   via `LIKE` instead of `to_tsvector`. No raw SQL anywhere in the code. The
+   `idx_products_fts` GIN index in V1 is therefore unused; swap to a registered
+   Hibernate FTS function later if ranking matters.
