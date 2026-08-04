@@ -69,7 +69,7 @@ public class ProductService {
         Pageable pageable = buildPageable(sort, page, limit);
         Page<Product> result = (q == null || q.isBlank())
                 ? productRepository.browse(categoryId, sellerId, minPrice, maxPrice, pageable)
-                : productRepository.search(q, categoryId, sellerId, minPrice, maxPrice, pageable);
+                : productRepository.search(q, categoryId, sellerId, minPrice, maxPrice, buildNativePageable(sort, page, limit));
         return toPageResponse(result);
     }
 
@@ -222,6 +222,24 @@ public class ProductService {
 
         Sort.Direction dir = "asc".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
         return PageRequest.of(page - 1, limit, Sort.by(dir, field));
+    }
+
+    private Pageable buildNativePageable(String sort, int page, int limit) {
+        String[] parts = sort == null ? new String[] {"createdAt", "desc"} : sort.split(":");
+        String field = parts[0];
+        String direction = parts.length > 1 ? parts[1] : "desc";
+
+        if (!SORTABLE_FIELDS.contains(field)) {
+            throw new BadRequestException("Invalid sort field: " + field);
+        }
+
+        String column = switch (field) {
+            case "createdAt" -> "created_at";
+            case "basePrice" -> "base_price";
+            default -> "name";
+        };
+        Sort.Direction dir = "asc".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        return PageRequest.of(page - 1, limit, Sort.by(dir, column));
     }
 
     private PageResponse<ProductResponse> toPageResponse(Page<Product> page) {

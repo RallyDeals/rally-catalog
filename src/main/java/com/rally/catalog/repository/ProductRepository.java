@@ -35,7 +35,8 @@ public interface ProductRepository extends JpaRepository<Product, String> {
               AND (:sellerId IS NULL OR p.seller_id::text = :sellerId)
               AND (:minPrice IS NULL OR p.base_price >= :minPrice)
               AND (:maxPrice IS NULL OR p.base_price <= :maxPrice)
-            """)
+            """,
+            nativeQuery = true)
     Page<Product> search(
             @Param("q") String q,
             @Param("categoryId") String categoryId,
