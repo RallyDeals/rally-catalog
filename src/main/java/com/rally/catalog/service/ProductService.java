@@ -16,10 +16,12 @@ import com.rally.common.exceptions.shared.BadRequestException;
 import com.rally.common.exceptions.shared.NotFoundException;
 import com.rally.catalog.repository.CategoryRepository;
 import com.rally.catalog.repository.ProductRepository;
+import com.rally.catalog.repository.ProductSpecifications;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,10 +69,12 @@ public class ProductService {
             BigDecimal minPrice, BigDecimal maxPrice,
             String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
-        Page<Product> result = (q == null || q.isBlank())
-                ? productRepository.browse(categoryId, sellerId, minPrice, maxPrice, pageable)
-                : productRepository.search(q, categoryId, sellerId, minPrice, maxPrice, buildNativePageable(sort, page, limit));
-        return toPageResponse(result);
+        Specification<Product> spec = Specification.where(ProductSpecifications.approvedAndNotDeleted())
+                .and(ProductSpecifications.keyword(q))
+                .and(ProductSpecifications.categoryIs(categoryId))
+                .and(ProductSpecifications.sellerIs(sellerId))
+                .and(ProductSpecifications.priceBetween(minPrice, maxPrice));
+        return toPageResponse(productRepository.findAll(spec, pageable));
     }
 
     @Transactional(readOnly = true)
@@ -152,14 +156,19 @@ public class ProductService {
             String sellerId, ProductStatus status, boolean includeDeleted,
             String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
-        return toPageResponse(productRepository.findBySeller(sellerId, status, includeDeleted, pageable));
+        Specification<Product> spec = Specification.where(ProductSpecifications.sellerIs(sellerId))
+                .and(ProductSpecifications.statusIs(status))
+                .and(ProductSpecifications.notDeleted(includeDeleted));
+        return toPageResponse(productRepository.findAll(spec, pageable));
     }
 
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> listAdminProducts(
             ProductStatus status, boolean includeDeleted, String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
-        return toPageResponse(productRepository.findAllForAdmin(status, includeDeleted, pageable));
+        Specification<Product> spec = Specification.where(ProductSpecifications.statusIs(status))
+                .and(ProductSpecifications.notDeleted(includeDeleted));
+        return toPageResponse(productRepository.findAll(spec, pageable));
     }
 
     @Transactional(readOnly = true)
@@ -172,7 +181,9 @@ public class ProductService {
         }
 
         Set<String> uniqueIds = new LinkedHashSet<>(ids);
-        List<Product> found = productRepository.findApprovedByIds(uniqueIds);
+        Specification<Product> spec = ProductSpecifications.idIn(uniqueIds)
+                .and(ProductSpecifications.approvedAndNotDeleted());
+        List<Product> found = productRepository.findAll(spec);
         Map<String, ProductLookupItem> foundMap = found.stream()
                 .collect(Collectors.toMap(
                         Product::getId,
@@ -222,24 +233,6 @@ public class ProductService {
 
         Sort.Direction dir = "asc".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
         return PageRequest.of(page - 1, limit, Sort.by(dir, field));
-    }
-
-    private Pageable buildNativePageable(String sort, int page, int limit) {
-        String[] parts = sort == null ? new String[] {"createdAt", "desc"} : sort.split(":");
-        String field = parts[0];
-        String direction = parts.length > 1 ? parts[1] : "desc";
-
-        if (!SORTABLE_FIELDS.contains(field)) {
-            throw new BadRequestException("Invalid sort field: " + field);
-        }
-
-        String column = switch (field) {
-            case "createdAt" -> "created_at";
-            case "basePrice" -> "base_price";
-            default -> "name";
-        };
-        Sort.Direction dir = "asc".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
-        return PageRequest.of(page - 1, limit, Sort.by(dir, column));
     }
 
     private PageResponse<ProductResponse> toPageResponse(Page<Product> page) {

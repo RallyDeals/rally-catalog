@@ -24,6 +24,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -36,9 +37,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -289,27 +287,26 @@ class ProductServiceTest {
     }
 
     @Test
-    void searchProducts_shouldDelegateToBrowseWithoutQuery() {
+    void searchProducts_shouldReturnApprovedProducts() {
         Page<Product> page = new PageImpl<>(List.of(product(ProductStatus.APPROVED)), PageRequest.of(0, 20), 1);
-        when(productRepository.browse(isNull(), isNull(), isNull(), isNull(), any(Pageable.class))).thenReturn(page);
+        when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
 
         PageResponse<ProductResponse> response = productService.searchProducts(null, null, null, null, null, null, 1, 20);
 
-        verify(productRepository).browse(any(), any(), any(), any(), any(Pageable.class));
-        verify(productRepository, never()).search(anyString(), any(), any(), any(), any(), any());
+        verify(productRepository).findAll(any(Specification.class), any(Pageable.class));
         assertEquals(1, response.getItems().size());
         assertEquals(20, response.getLimit());
     }
 
     @Test
-    void searchProducts_shouldDelegateToFullTextSearchWithQuery() {
-        Page<Product> page = new PageImpl<>(List.of(product(ProductStatus.APPROVED)));
-        when(productRepository.search(eq("headphones"), any(), any(), any(), any(), any(Pageable.class))).thenReturn(page);
+    void searchProducts_shouldApplyKeywordToCriteriaQuery() {
+        Page<Product> page = new PageImpl<>(List.of(product(ProductStatus.APPROVED)), PageRequest.of(0, 20), 1);
+        when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
 
-        productService.searchProducts("headphones", null, null, null, null, null, 1, 20);
+        PageResponse<ProductResponse> response = productService.searchProducts("headphones", null, null, null, null, null, 1, 20);
 
-        verify(productRepository).search(eq("headphones"), any(), any(), any(), any(), any(Pageable.class));
-        verify(productRepository, never()).browse(any(), any(), any(), any(), any());
+        verify(productRepository).findAll(any(Specification.class), any(Pageable.class));
+        assertEquals(1, response.getItems().size());
     }
 
     @Test
@@ -329,7 +326,7 @@ class ProductServiceTest {
     @Test
     void listSellerProducts_shouldFilterBySeller() {
         Page<Product> page = new PageImpl<>(List.of(product(ProductStatus.APPROVED)));
-        when(productRepository.findBySeller(eq("seller-1"), isNull(), eq(false), any(Pageable.class))).thenReturn(page);
+        when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
 
         PageResponse<ProductResponse> response = productService.listSellerProducts("seller-1", null, false, null, 1, 20);
 
@@ -339,7 +336,7 @@ class ProductServiceTest {
     @Test
     void listAdminProducts_shouldReturnAllWithStatus() {
         Page<Product> page = new PageImpl<>(List.of(product(ProductStatus.PENDING_APPROVAL)));
-        when(productRepository.findAllForAdmin(eq(ProductStatus.PENDING_APPROVAL), eq(false), any(Pageable.class))).thenReturn(page);
+        when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
 
         PageResponse<ProductResponse> response = productService.listAdminProducts(ProductStatus.PENDING_APPROVAL, false, null, 1, 20);
 
@@ -349,7 +346,7 @@ class ProductServiceTest {
     @Test
     void lookupProducts_shouldSplitFoundAndNotFound() {
         Product approved = product(ProductStatus.APPROVED);
-        when(productRepository.findApprovedByIds(any())).thenReturn(List.of(approved));
+        when(productRepository.findAll(any(Specification.class))).thenReturn(List.of(approved));
 
         ProductLookupResponse response = productService.lookupProducts(List.of("prod-1", "prod-2"));
 
