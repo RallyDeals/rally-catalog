@@ -5,7 +5,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- =====================================================================
 
 CREATE TABLE categories (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id          VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
     name        VARCHAR(100) NOT NULL UNIQUE,
     description TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -16,11 +16,11 @@ CREATE TABLE categories (
 -- =====================================================================
 
 CREATE TABLE products (
-    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    seller_id         UUID NOT NULL,
+    id                VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    seller_id         VARCHAR(36) NOT NULL,
     name              VARCHAR(255) NOT NULL,
     description       TEXT NOT NULL DEFAULT '',
-    category_id       UUID REFERENCES categories(id),
+    category_id       VARCHAR(36) REFERENCES categories(id),
     base_price        NUMERIC(10,2) NOT NULL CHECK (base_price >= 0),
     image_url         VARCHAR(500),
 

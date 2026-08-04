@@ -29,9 +29,10 @@ public class Product {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(length = 36)
     private String id;
 
-    @Column(name = "seller_id", nullable = false)
+    @Column(name = "seller_id", nullable = false, length = 36)
     private String sellerId;
 
     @Column(nullable = false)
