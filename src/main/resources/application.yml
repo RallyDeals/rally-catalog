@@ -1,3 +1,7 @@
+rally:
+  jwt:
+    secret: ${JWT_SECRET:/Wepykoli0z1033egoGDdLrm3eohJiOJUxT5L/RxgV0=}
+
 spring:
   application:
     name: rally-catalog
