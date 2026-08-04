@@ -44,7 +44,7 @@ public interface ProductRepository extends JpaRepository<Product, String> {
             @Param("maxPrice") BigDecimal maxPrice,
             Pageable pageable);
 
-    @Query("""
+    @Query(value = """
             SELECT p FROM Product p
             WHERE p.status = 'APPROVED'
               AND p.deletedAt IS NULL
@@ -69,7 +69,7 @@ public interface ProductRepository extends JpaRepository<Product, String> {
             @Param("maxPrice") BigDecimal maxPrice,
             Pageable pageable);
 
-    @Query("""
+    @Query(value = """
             SELECT p FROM Product p
             WHERE p.sellerId = :sellerId
               AND (:status IS NULL OR p.status = :status)
@@ -87,7 +87,7 @@ public interface ProductRepository extends JpaRepository<Product, String> {
             @Param("includeDeleted") boolean includeDeleted,
             Pageable pageable);
 
-    @Query("""
+    @Query(value = """
             SELECT p FROM Product p
             WHERE (:status IS NULL OR p.status = :status)
               AND (:includeDeleted = true OR p.deletedAt IS NULL)
