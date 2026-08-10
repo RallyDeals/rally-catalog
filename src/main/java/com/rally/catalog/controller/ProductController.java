@@ -106,12 +106,15 @@ public class ProductController {
             @RequestParam(required = false) String sort,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit) {
+        // ADMIN enforcement via AdminRoleFilter (com.rally.catalog.config) — disabled
+        // until the Auth service is implemented. See SecurityConfig.
         return ResponseEntity.ok(productService.listAdminProducts(
                 status, includeDeleted, sort, page, limit));
     }
 
     @PatchMapping("/admin/{id}/approve")
     public ResponseEntity<ProductResponse> approveProduct(@PathVariable String id) {
+        // ADMIN enforcement via AdminRoleFilter — disabled until Auth service exists.
         return ResponseEntity.ok(productService.approveProduct(id));
     }
 
@@ -119,6 +122,7 @@ public class ProductController {
     public ResponseEntity<ProductResponse> rejectProduct(
             @PathVariable String id,
             @RequestBody(required = false) RejectRequest request) {
+        // ADMIN enforcement via AdminRoleFilter — disabled until Auth service exists.
         String reason = request == null ? null : request.getReason();
         return ResponseEntity.ok(productService.rejectProduct(id, reason));
     }
