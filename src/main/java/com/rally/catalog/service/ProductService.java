@@ -28,7 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -186,7 +185,7 @@ public class ProductService {
                         catalogMapper::toProductLookupItem));
 
         ProductLookupResponse response = new ProductLookupResponse();
-        response.setFound(new ArrayList<>(foundMap.values()));
+        response.setFound(foundMap);
         response.setNotFound(uniqueIds.stream()
                 .filter(id -> !foundMap.containsKey(id))
                 .collect(Collectors.toList()));

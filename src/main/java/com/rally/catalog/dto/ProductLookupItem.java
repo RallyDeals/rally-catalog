@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 public class ProductLookupItem {
 
     private String id;
+    private String name;
     private BigDecimal basePrice;
     private String imageUrl;
 }

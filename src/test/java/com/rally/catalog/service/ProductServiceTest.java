@@ -352,7 +352,8 @@ class ProductServiceTest {
         ProductLookupResponse response = productService.lookupProducts(List.of("prod-1", "prod-2"));
 
         assertEquals(1, response.getFound().size());
-        assertEquals("prod-1", response.getFound().get(0).getId());
+        assertTrue(response.getFound().containsKey("prod-1"));
+        assertEquals("prod-1", response.getFound().get("prod-1").getId());
         assertEquals(List.of("prod-2"), response.getNotFound());
     }
 
