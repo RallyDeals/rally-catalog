@@ -18,6 +18,7 @@ what is still needed.
   (see [Identity & Gateway](#identity--api-gateway-contract))
 - **Flyway** — versioned DB schema + seed data
 - **Lombok** — DTO/entity boilerplate
+- **MapStruct** — compile-time entity → DTO mapping (`CatalogMapper`, same setup as order-service)
 - **rally-common** — shared `BaseException` hierarchy + `JwtService`
 - **H2** (test scope) + JUnit 5 / Mockito for unit tests
 
@@ -28,18 +29,19 @@ what is still needed.
 ```
 rally-catalog/
 ├── Dockerfile                    # multi-stage: installs rally-common v0.2.0 from GitHub, packages jar
-├── docker-compose.yml            # catalog-db (host 5433) + catalog-service (host 8083)
+├── docker-compose.yml            # catalog-db only (host 5433); catalog-service commented out for local IntelliJ dev
 ├── postman/
 │   └── rally-catalog.postman_collection.json   # importable end-to-end test collection
 └── src/
     ├── main/
     │   ├── java/com/rally/catalog/
     │   │   ├── CatalogServiceApplication.java
-    │   │   ├── config/SecurityConfig.java      # permitAll; role checks live in ProductService
+    │   │   ├── config/SecurityConfig.java      # permitAll; AdminRoleFilter (disabled) guards /products/admin/*
     │   │   ├── controller/                      # CategoryController, ProductController
-    │   │   ├── dto/                             # request/response records (PageResponse, ...)
+    │   │   ├── dto/                             # request/response DTOs (PageResponse, ...)
     │   │   ├── entity/                          # Category, Product, ProductStatus
     │   │   ├── exception/GoneException.java     # 410 for soft-deleted product re-delete
+    │   │   ├── mapper/CatalogMapper.java        # MapStruct entity ↔ DTO mappers
     │   │   ├── repository/                      # JPA repos + ProductSpecifications (Criteria API, no SQL strings)
     │   │   └── service/                         # ProductService, CategoryService (business rules)
     │   └── resources/
@@ -111,7 +113,10 @@ The gateway (not yet built) is the single entry point and owns JWT handling:
    - `X-User-Role` — JWT roles
 4. Catalog never validates tokens itself. `SecurityConfig` is `permitAll` and the
    rally-common `JwtAuthenticationFilter` is registered **disabled**; role/ownership
-   rules are enforced in `ProductService` from the injected headers.
+   rules are enforced service-side from the injected headers:
+   - `AdminRoleFilter` (written, **disabled** until Auth service exists) guards
+     `/products/admin/*` against non-`ADMIN` callers;
+   - ownership checks (non-owner → 403) run in `ProductService`.
 
 The Postman collection (`postman/rally-catalog.postman_collection.json`) simulates
 the gateway by setting `X-User-Id` / `X-User-Role` directly.
@@ -138,17 +143,21 @@ appear in buyer browse/search.
 
 - JDK 21, Docker + Docker Compose
 
-### 1. Start the service (recommended)
+### 1. Start the database (Docker)
 
 ```bash
 cd rally-catalog
 docker compose up -d --build
 ```
 
-| Container       | Host port | Notes |
-|-----------------|-----------|-------|
-| `catalog-service` | `8083`  | Spring Boot app |
-| `catalog-db`      | `5433`  | PostgreSQL, db `catalog_db`, user/pass `postgres/postgres` |
+| Container | Host port | Notes |
+|-----------|-----------|-------|
+| `catalog-db` | `5433` | PostgreSQL, db `catalog_db`, user/pass `postgres/postgres` |
+
+> The `catalog-service` block in `docker-compose.yml` is **commented out** for local
+> dev — you run the app from IntelliJ (or `mvn spring-boot:run`) and only the DB comes
+> from Docker. To run the app in Docker instead, uncomment that block (it also enables
+> the JVM debug port `5005` for remote debugging from IntelliJ).
 
 Flyway runs `V1` (schema) + `V2` (seed) automatically on startup. To start from a
 clean DB: `docker compose down -v && docker compose up -d --build`.
@@ -163,7 +172,7 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:catalog_db}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:catalog_db}
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:postgres}
   jpa.hibernate.ddl-auto: validate
@@ -178,14 +187,15 @@ The `rally.jwt.secret` is required because `rally-common` auto-configures a
 `JwtService` bean at startup (it is not used for request auth yet). In production,
 override via the `JWT_SECRET` env var — same value on every service.
 
-### 3. Run locally (without Docker for the app)
+### 3. Run the app locally (IntelliJ or Maven)
 
 ```bash
-./mvnw spring-boot:run
+mvn spring-boot:run        # or ./mvnw spring-boot:run
 ```
 
-Requires a Postgres reachable at the datasource URL above (e.g. the `catalog-db`
-container).
+Requires the `catalog-db` Postgres container from step 1 (reachable at the datasource
+URL above). Run from IntelliJ with a `Remote JVM Debug` config on port `5005` to
+breakpoint the containerized app, or just run the app config directly.
 
 ### 4. Test with Postman
 
@@ -195,7 +205,7 @@ Import `postman/rally-catalog.postman_collection.json`. It auto-saves generated
 ### 5. Run unit tests
 
 ```bash
-./mvnw test        # 35 tests: ProductServiceTest + CategoryServiceTest
+mvn test        # or ./mvnw test   — 35 tests: ProductServiceTest + CategoryServiceTest
 ```
 
 ---
@@ -203,26 +213,24 @@ Import `postman/rally-catalog.postman_collection.json`. It auto-saves generated
 ## Known Gaps / What It Needs to Fully Work
 
 From `gaps-and-solutions.md` and a spec-vs-implementation review of
-`catalog-service.md`:
+`catalog-service.md` (spec was updated to match the implementation — paths and response
+envelopes in the doc reflect the code):
 
-1. **API Gateway not built** — no real JWT login flow; without it, anyone can set
-   `X-User-Id` / `X-User-Role`. Build the gateway or enable the
+1. **Auth service / API Gateway not built** — no real JWT login flow; without it, anyone
+   can set `X-User-Id` / `X-User-Role`. Build auth + gateway, or enable the
    `JwtAuthenticationFilter`.
-2. **Admin endpoints not role-protected** — `GET /products/admin` and the
-   approve/reject routes accept any caller. Enforce `ADMIN` at the gateway or in a
-   filter.
-3. **Response-shape mismatches vs the spec doc**:
-   - `GET /products` returns `{ "items": [...] }`; spec says `{ "products": [...] }`.
-   - `GET /categories` returns a bare array; spec says `{ "categories": [...] }`.
-   - Admin paths are `/products/admin/...`; spec says `/admin/products/...`.
-   - Seller list is `GET /products/sellers/{id}`; spec says `GET /sellers/{id}/products`.
-4. **`DELETE /products/{id}` → 409 "tied to active deal"** not implemented — needs
-   Deal Service coordination; currently only soft-delete (204) + re-delete (410).
-5. **Schema deviation** — `id`/`seller_id`/`category_id` use `VARCHAR(36)` (String
+2. **Admin endpoints not yet role-protected** — `AdminRoleFilter` exists but is
+   **disabled** (commented `@Component` / bean in `SecurityConfig`). Uncomment it once
+   the Auth service makes `X-User-Role` trustworthy.
+3. **`DELETE /products/{id}` → 409 "tied to active deal"** not implemented — currently
+   only soft-delete (204) + re-delete (410). Requires a Deal Service contract
+   (sync `GET /internal/deals?productId=...&active=true` or deal events) — see
+   `catalog-service.md` §10.1.
+4. **Schema deviation** — `id`/`seller_id`/`category_id` use `VARCHAR(36)` (String
    ids with `GenerationType.UUID`) instead of the native `uuid` type in the spec's
    SQL. Invisible at the API level.
-6. **Search is LIKE-based, not Postgres full-text** — all queries are built with
+5. **Search is LIKE-based, not Postgres full-text** — all queries are built with
    the JPA Criteria API (`ProductSpecifications`), so `q` matches `name`/`description`
-   via `LIKE` instead of `to_tsvector`. No raw SQL anywhere in the code. The
-   `idx_products_fts` GIN index in V1 is therefore unused; swap to a registered
-   Hibernate FTS function later if ranking matters.
+   via `LIKE` instead of `to_tsvector` (documented as the agreed behavior in
+   `catalog-service.md` §7.1). The `idx_products_fts` GIN index in V1 is unused; swap
+   to a registered Hibernate FTS function later if ranking matters.
