@@ -10,6 +10,7 @@ import com.rally.catalog.entity.Category;
 import com.rally.catalog.entity.Product;
 import com.rally.catalog.entity.ProductStatus;
 import com.rally.catalog.exception.GoneException;
+import com.rally.catalog.mapper.CatalogMapper;
 import com.rally.common.exceptions.domain.catalog.ProductNotFoundException;
 import com.rally.common.exceptions.domain.catalog.ProductNotOwnedException;
 import com.rally.common.exceptions.shared.BadRequestException;
@@ -44,10 +45,13 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final CatalogMapper catalogMapper;
 
-    public ProductService(ProductRepository productRepository, CategoryRepository categoryRepository) {
+    public ProductService(ProductRepository productRepository, CategoryRepository categoryRepository,
+                          CatalogMapper catalogMapper) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
+        this.catalogMapper = catalogMapper;
     }
 
     public ProductResponse createProduct(String sellerId, ProductRequest request) {
@@ -60,7 +64,7 @@ public class ProductService {
                 request.getBasePrice(),
                 request.getImageUrl()
         );
-        return ProductResponse.from(productRepository.save(product));
+        return catalogMapper.toProductResponse(productRepository.save(product));
     }
 
     @Transactional(readOnly = true)
@@ -81,13 +85,13 @@ public class ProductService {
     public ProductResponse getProduct(String id, String viewerRole, String viewerId) {
         Product product = findById(id);
         if (ROLE_ADMIN.equals(viewerRole)) {
-            return ProductResponse.from(product);
+            return catalogMapper.toProductResponse(product);
         }
         if (ROLE_SELLER.equals(viewerRole) && product.getSellerId().equals(viewerId)) {
-            return ProductResponse.from(product);
+            return catalogMapper.toProductResponse(product);
         }
         if (product.getStatus() == ProductStatus.APPROVED && !product.isDeleted()) {
-            return ProductResponse.from(product);
+            return catalogMapper.toProductResponse(product);
         }
         throw new ProductNotFoundException(id);
     }
@@ -119,7 +123,7 @@ public class ProductService {
             product.setRejectionReason(null);
         }
 
-        return ProductResponse.from(productRepository.save(product));
+        return catalogMapper.toProductResponse(productRepository.save(product));
     }
 
     public void deleteProduct(String id, String sellerId) {
@@ -127,6 +131,9 @@ public class ProductService {
         if (product.isDeleted()) {
             throw new GoneException("Product already deleted");
         }
+        // TODO(deal): return 409 when the product is tied to an active deal. Requires a
+        //  Deal Service contract (sync: GET /internal/deals?productId={id}&active=true, or
+        //  deal lifecycle events). See rally-docs/services docs/catalog-service.md §10.1.
         product.setDeletedAt(LocalDateTime.now());
         productRepository.save(product);
     }
@@ -138,7 +145,7 @@ public class ProductService {
         }
         product.setStatus(ProductStatus.APPROVED);
         product.setRejectionReason(null);
-        return ProductResponse.from(productRepository.save(product));
+        return catalogMapper.toProductResponse(productRepository.save(product));
     }
 
     public ProductResponse rejectProduct(String id, String reason) {
@@ -148,7 +155,7 @@ public class ProductService {
         }
         product.setStatus(ProductStatus.REJECTED);
         product.setRejectionReason(reason);
-        return ProductResponse.from(productRepository.save(product));
+        return catalogMapper.toProductResponse(productRepository.save(product));
     }
 
     @Transactional(readOnly = true)
@@ -187,7 +194,7 @@ public class ProductService {
         Map<String, ProductLookupItem> foundMap = found.stream()
                 .collect(Collectors.toMap(
                         Product::getId,
-                        product -> new ProductLookupItem(product.getId(), product.getBasePrice(), product.getImageUrl())));
+                        catalogMapper::toProductLookupItem));
 
         ProductLookupResponse response = new ProductLookupResponse();
         response.setFound(new ArrayList<>(foundMap.values()));
@@ -237,7 +244,7 @@ public class ProductService {
 
     private PageResponse<ProductResponse> toPageResponse(Page<Product> page) {
         List<ProductResponse> items = page.getContent().stream()
-                .map(ProductResponse::from)
+                .map(catalogMapper::toProductResponse)
                 .collect(Collectors.toList());
         return new PageResponse<>(items, page.getNumber() + 1, page.getSize(), page.getTotalElements());
     }

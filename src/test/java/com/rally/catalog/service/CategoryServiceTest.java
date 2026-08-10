@@ -3,6 +3,7 @@ package com.rally.catalog.service;
 import com.rally.catalog.dto.CategoryRequest;
 import com.rally.catalog.dto.CategoryResponse;
 import com.rally.catalog.entity.Category;
+import com.rally.catalog.mapper.CatalogMapperImpl;
 import com.rally.catalog.repository.CategoryRepository;
 import com.rally.catalog.repository.ProductRepository;
 import com.rally.common.exceptions.shared.BadRequestException;
@@ -36,7 +37,7 @@ class CategoryServiceTest {
 
     @BeforeEach
     void setUp() {
-        categoryService = new CategoryService(categoryRepository, productRepository);
+        categoryService = new CategoryService(categoryRepository, productRepository, new CatalogMapperImpl());
     }
 
     @Test

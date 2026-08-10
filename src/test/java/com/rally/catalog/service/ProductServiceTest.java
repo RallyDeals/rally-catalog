@@ -9,6 +9,7 @@ import com.rally.catalog.entity.Category;
 import com.rally.catalog.entity.Product;
 import com.rally.catalog.entity.ProductStatus;
 import com.rally.catalog.exception.GoneException;
+import com.rally.catalog.mapper.CatalogMapperImpl;
 import com.rally.catalog.repository.CategoryRepository;
 import com.rally.catalog.repository.ProductRepository;
 import com.rally.common.exceptions.domain.catalog.ProductNotOwnedException;
@@ -54,7 +55,7 @@ class ProductServiceTest {
 
     @BeforeEach
     void setUp() {
-        productService = new ProductService(productRepository, categoryRepository);
+        productService = new ProductService(productRepository, categoryRepository, new CatalogMapperImpl());
     }
 
     private Category category() {

@@ -3,6 +3,7 @@ package com.rally.catalog.service;
 import com.rally.catalog.dto.CategoryRequest;
 import com.rally.catalog.dto.CategoryResponse;
 import com.rally.catalog.entity.Category;
+import com.rally.catalog.mapper.CatalogMapper;
 import com.rally.catalog.repository.CategoryRepository;
 import com.rally.catalog.repository.ProductRepository;
 import com.rally.common.exceptions.shared.BadRequestException;
@@ -11,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -19,10 +19,13 @@ public class CategoryService {
 
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
+    private final CatalogMapper catalogMapper;
 
-    public CategoryService(CategoryRepository categoryRepository, ProductRepository productRepository) {
+    public CategoryService(CategoryRepository categoryRepository, ProductRepository productRepository,
+                           CatalogMapper catalogMapper) {
         this.categoryRepository = categoryRepository;
         this.productRepository = productRepository;
+        this.catalogMapper = catalogMapper;
     }
 
     public CategoryResponse createCategory(CategoryRequest request) {
@@ -30,26 +33,24 @@ public class CategoryService {
             throw new BadRequestException("Category already exists: " + request.getName());
         }
         Category category = new Category(request.getName(), request.getDescription());
-        return CategoryResponse.from(categoryRepository.save(category));
+        return catalogMapper.toCategoryResponse(categoryRepository.save(category));
     }
 
     @Transactional(readOnly = true)
     public List<CategoryResponse> listCategories() {
-        return categoryRepository.findAll().stream()
-                .map(CategoryResponse::from)
-                .collect(Collectors.toList());
+        return catalogMapper.toCategoryResponses(categoryRepository.findAll());
     }
 
     @Transactional(readOnly = true)
     public CategoryResponse getCategory(String id) {
-        return CategoryResponse.from(findCategory(id));
+        return catalogMapper.toCategoryResponse(findCategory(id));
     }
 
     public CategoryResponse updateCategory(String id, CategoryRequest request) {
         Category category = findCategory(id);
         category.setName(request.getName());
         category.setDescription(request.getDescription());
-        return CategoryResponse.from(categoryRepository.save(category));
+        return catalogMapper.toCategoryResponse(categoryRepository.save(category));
     }
 
     public void deleteCategory(String id) {
