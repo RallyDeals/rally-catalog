@@ -102,20 +102,9 @@ public class ProductService {
             throw new GoneException("Product already deleted");
         }
 
-        if (request.getName() != null) {
-            product.setName(request.getName());
-        }
-        if (request.getDescription() != null) {
-            product.setDescription(request.getDescription());
-        }
+        catalogMapper.applyUpdate(product, request);
         if (request.getCategoryId() != null) {
             product.setCategory(findCategory(request.getCategoryId()));
-        }
-        if (request.getBasePrice() != null) {
-            product.setBasePrice(request.getBasePrice());
-        }
-        if (request.getImageUrl() != null) {
-            product.setImageUrl(request.getImageUrl());
         }
 
         if (product.getStatus() == ProductStatus.REJECTED) {
