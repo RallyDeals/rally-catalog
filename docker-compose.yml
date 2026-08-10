@@ -16,20 +16,23 @@ services:
       timeout: 5s
       retries: 10
 
-  catalog-service:
-    build: .
-    container_name: catalog-service
-    depends_on:
-      catalog-db:
-        condition: service_healthy
-    environment:
-      DB_HOST: catalog-db
-      DB_PORT: 5432
-      DB_NAME: catalog_db
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-    ports:
-      - "8083:8083"
+# catalog-service: commented out for local dev — run the app from IntelliJ, use only catalog-db from Docker.
+#   catalog-service:
+#     build: .
+#     container_name: catalog-service
+#     depends_on:
+#       catalog-db:
+#         condition: service_healthy
+#     environment:
+#       DB_HOST: catalog-db
+#       DB_PORT: 5432
+#       DB_NAME: catalog_db
+#       DB_USER: postgres
+#       DB_PASSWORD: postgres
+#       JAVA_TOOL_OPTIONS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+#     ports:
+#       - "8083:8083"
+#       - "5005:5005"
 
 volumes:
   catalog-db-data:
