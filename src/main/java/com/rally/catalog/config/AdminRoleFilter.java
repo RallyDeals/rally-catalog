@@ -1,6 +1,7 @@
 package com.rally.catalog.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rally.catalog.entity.Role;
 import com.rally.common.exceptions.handler.ErrorResponse;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -51,7 +52,7 @@ public class AdminRoleFilter extends OncePerRequestFilter {
     private boolean isAdmin(String role) {
         return Arrays.stream(role.split(","))
                 .map(String::trim)
-                .anyMatch("ADMIN"::equals);
+                .anyMatch(Role.ADMIN.name()::equals);
     }
 
     private void writeForbidden(HttpServletRequest request, HttpServletResponse response) throws IOException {

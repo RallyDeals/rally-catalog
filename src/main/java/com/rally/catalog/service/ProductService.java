@@ -9,6 +9,7 @@ import com.rally.catalog.dto.ProductUpdateRequest;
 import com.rally.catalog.entity.Category;
 import com.rally.catalog.entity.Product;
 import com.rally.catalog.entity.ProductStatus;
+import com.rally.catalog.entity.Role;
 import com.rally.catalog.exception.GoneException;
 import com.rally.catalog.mapper.CatalogMapper;
 import com.rally.common.exceptions.domain.catalog.ProductNotFoundException;
@@ -39,8 +40,6 @@ import java.util.stream.Collectors;
 @Transactional
 public class ProductService {
 
-    private static final String ROLE_ADMIN = "ADMIN";
-    private static final String ROLE_SELLER = "SELLER";
     private static final Set<String> SORTABLE_FIELDS = Set.of("createdAt", "basePrice", "name");
 
     private final ProductRepository productRepository;
@@ -82,12 +81,12 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public ProductResponse getProduct(String id, String viewerRole, UUID viewerId) {
+    public ProductResponse getProduct(String id, Role viewerRole, UUID viewerId) {
         Product product = findById(id);
-        if (ROLE_ADMIN.equals(viewerRole)) {
+        if (viewerRole == Role.ADMIN) {
             return catalogMapper.toProductResponse(product);
         }
-        if (ROLE_SELLER.equals(viewerRole) && viewerId != null
+        if (viewerRole == Role.SELLER && viewerId != null
                 && product.getSellerId().equals(viewerId.toString())) {
             return catalogMapper.toProductResponse(product);
         }

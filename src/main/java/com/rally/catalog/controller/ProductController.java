@@ -8,6 +8,7 @@ import com.rally.catalog.dto.ProductResponse;
 import com.rally.catalog.dto.ProductUpdateRequest;
 import com.rally.catalog.dto.RejectRequest;
 import com.rally.catalog.entity.ProductStatus;
+import com.rally.catalog.entity.Role;
 import com.rally.catalog.service.ProductService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -63,7 +64,7 @@ public class ProductController {
             @PathVariable String id,
             @RequestHeader(value = "X-User-Role", required = false) String role,
             @RequestHeader(value = "X-User-Id", required = false) UUID userId) {
-        return ResponseEntity.ok(productService.getProduct(id, role, userId));
+        return ResponseEntity.ok(productService.getProduct(id, Role.fromValue(role), userId));
     }
 
     @PatchMapping("/{id}")

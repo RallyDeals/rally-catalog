@@ -8,6 +8,7 @@ import com.rally.catalog.dto.ProductUpdateRequest;
 import com.rally.catalog.entity.Category;
 import com.rally.catalog.entity.Product;
 import com.rally.catalog.entity.ProductStatus;
+import com.rally.catalog.entity.Role;
 import com.rally.catalog.exception.GoneException;
 import com.rally.catalog.mapper.CatalogMapperImpl;
 import com.rally.catalog.repository.CategoryRepository;
@@ -118,7 +119,7 @@ class ProductServiceTest {
         Product pending = product(ProductStatus.PENDING_APPROVAL);
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(pending));
 
-        assertThrows(NotFoundException.class, () -> productService.getProduct("prod-1", "BUYER", BUYER));
+        assertThrows(NotFoundException.class, () -> productService.getProduct("prod-1", Role.BUYER, BUYER));
     }
 
     @Test
@@ -126,7 +127,7 @@ class ProductServiceTest {
         Product approved = product(ProductStatus.APPROVED);
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
 
-        ProductResponse response = productService.getProduct("prod-1", "BUYER", BUYER);
+        ProductResponse response = productService.getProduct("prod-1", Role.BUYER, BUYER);
 
         assertEquals("prod-1", response.getId());
     }
@@ -136,7 +137,7 @@ class ProductServiceTest {
         Product rejected = product(ProductStatus.REJECTED);
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(rejected));
 
-        ProductResponse response = productService.getProduct("prod-1", "SELLER", SELLER);
+        ProductResponse response = productService.getProduct("prod-1", Role.SELLER, SELLER);
 
         assertEquals(ProductStatus.REJECTED, response.getStatus());
     }
@@ -146,7 +147,7 @@ class ProductServiceTest {
         Product pending = product(ProductStatus.PENDING_APPROVAL);
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(pending));
 
-        assertThrows(NotFoundException.class, () -> productService.getProduct("prod-1", "SELLER", OTHER));
+        assertThrows(NotFoundException.class, () -> productService.getProduct("prod-1", Role.SELLER, OTHER));
     }
 
     @Test
@@ -154,7 +155,7 @@ class ProductServiceTest {
         Product approved = product(ProductStatus.APPROVED);
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
 
-        ProductResponse response = productService.getProduct("prod-1", "SELLER", OTHER);
+        ProductResponse response = productService.getProduct("prod-1", Role.SELLER, OTHER);
 
         assertEquals("prod-1", response.getId());
     }
@@ -164,7 +165,7 @@ class ProductServiceTest {
         Product pending = product(ProductStatus.PENDING_APPROVAL);
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(pending));
 
-        ProductResponse response = productService.getProduct("prod-1", "ADMIN", ADMIN);
+        ProductResponse response = productService.getProduct("prod-1", Role.ADMIN, ADMIN);
 
         assertEquals(ProductStatus.PENDING_APPROVAL, response.getStatus());
     }
