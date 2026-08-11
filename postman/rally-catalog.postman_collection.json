@@ -1,16 +1,16 @@
 {
   "info": {
     "name": "RallyDeals - Catalog Service",
-    "description": "# RallyDeals Catalog Service\n\nTest collection for the catalog service, routed **through the API Gateway** (`http://localhost:8080`). The gateway must be running with `CATALOG_SERVICE_URI` pointing at the catalog service (`http://localhost:8083`).\n\n## Authentication\n\nEvery request below sends `Authorization: Bearer <JWT>`. The gateway **parses and validates** the JWT (rally-common `JwtService.parseAndValidate`; JWT is signed HMAC, not encrypted), strips it, and **injects identity headers** before forwarding:\n\n- `X-User-Id`  -> value of the JWT `sub` claim\n- `X-User-Role` -> value of the JWT roles claim\n\nThe catalog service never validates the token itself; it reads `X-User-Id` / `X-User-Role` and trusts them (they come only from the gateway).\n\nTo run this collection you need three tokens (one per role) from the Auth Service (`POST /auth/login`), stored in the collection variables:\n\n- `sellerJwt` -> a SELLER token (own products, categories)\n- `buyerJwt`  -> a BUYER token (browse approved products)\n- `adminJwt`  -> an ADMIN token (moderation, category writes)\n\nSet them once in the collection variables (or a Postman environment) before running.\n\n## Seed data\n\nRun the requests in order: the **Categories -> Create Category** and **Products -> Create Product** requests save their generated ids into the `categoryId` / `productId` collection variables, so later requests run end-to-end.\n\n## Notes\n\n- The tokens' `sub` must match the `sellerId` (`user-1`) and `buyerId` (`user-2`) collection variables — the create-product assertion checks `sellerId` equals `user-1`.\n- `GET /products/{id}` returns `404` for buyers/non-owners and `200` for the owning seller, `ADMIN`, or when called with an admin token.\n- `GET /products` (buyer view) only returns `APPROVED` and non-deleted products.\n- Admin queue lives at `/products/admin` (see Admin Moderation folder).",
+    "description": "# RallyDeals Catalog Service\n\nTest collection for the catalog service, routed **through the API Gateway** (`http://localhost:8080`). The gateway must be running with `CATALOG_SERVICE_URI` pointing at the catalog service (`http://localhost:8083`).\n\n## Authentication\n\nEvery request below sends `Authorization: Bearer <JWT>`. The gateway **parses and validates** the JWT (rally-common `JwtService.parseAndValidate`; JWT is signed HMAC, not encrypted), strips it, and **injects identity headers** before forwarding:\n\n- `X-User-Id`  -> value of the JWT `sub` claim\n- `X-User-Role` -> value of the JWT roles claim\n\nThe catalog service never validates the token itself; it reads `X-User-Id` / `X-User-Role` and trusts them (they come only from the gateway).\n\nThe collection ships with **pre-generated static dev tokens** (expire 2099) in the `sellerJwt` / `buyerJwt` / `adminJwt` collection variables, signed with the canonical dev `JWT_SECRET`: `/Wepykoli0z1033egoGDdLrm3eohJiOJUxT5L/RxgV0=`. They work against the locally running gateway with no Auth Service up. To regenerate, sign an HS256 JWT with that secret, matching the `sub`/`iss`/`roles` shape `JwtService` expects:\n\n- `sellerJwt` -> sub `user-1`, roles `[\"SELLER\"]`\n- `buyerJwt`  -> sub `user-2`, roles `[\"BUYER\"]`\n- `adminJwt`  -> sub `user-3`, roles `[\"ADMIN\"]`\n- `iss` = `rally-auth-service`, plus `iat`/`exp`\n\n> **Note:** if you get 401s, the gateway process is running with a *different* `JWT_SECRET` than this canonical value. Restart it so it re-reads `rally-gateway/.env`.\n\n## Seed data\n\nRun the requests in order: the **Categories -> Create Category** and **Products -> Create Product** requests save their generated ids into the `categoryId` / `productId` collection variables, so later requests run end-to-end.\n\n## Notes\n\n- The tokens' `sub` must match the `sellerId` (`user-1`) and `buyerId` (`user-2`) collection variables — the create-product assertion checks `sellerId` equals `user-1`.\n- `GET /products/{id}` returns `404` for buyers/non-owners and `200` for the owning seller, `ADMIN`, or when called with an admin token.\n- `GET /products` (buyer view) only returns `APPROVED` and non-deleted products.\n- `GET /products/sellers/{sellerId}` and `GET /products/admin` include soft-deleted products by default (`includeDeleted` defaults to `true`); responses expose `deleted` / `deletedAt` so you can tell them apart.\n- Admin queue lives at `/products/admin` (see Admin Moderation folder).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
     { "key": "sellerId", "value": "user-1", "type": "string" },
     { "key": "buyerId", "value": "user-2", "type": "string" },
-    { "key": "sellerJwt", "value": "", "type": "string" },
-    { "key": "buyerJwt", "value": "", "type": "string" },
-    { "key": "adminJwt", "value": "", "type": "string" },
+    { "key": "sellerJwt", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTEiLCJpc3MiOiJyYWxseS1hdXRoLXNlcnZpY2UiLCJyb2xlcyI6WyJTRUxMRVIiXSwiaWF0IjoxNzg2NDYyNDc1LCJleHAiOjQwNzA5MDg4MDB9.-8TAakLjXh2VJ1zQU4zKLs5KBHzUmNJRMaz77rtjvOw", "type": "string" },
+    { "key": "buyerJwt", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTIiLCJpc3MiOiJyYWxseS1hdXRoLXNlcnZpY2UiLCJyb2xlcyI6WyJCVVlFUiJdLCJpYXQiOjE3ODY0NjI0NzYsImV4cCI6NDA3MDkwODgwMH0.AwhD0DKpHW-BEP0yJoTROOa--5l3uT_gHosTBcyZKhU", "type": "string" },
+    { "key": "adminJwt", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTMiLCJpc3MiOiJyYWxseS1hdXRoLXNlcnZpY2UiLCJyb2xlcyI6WyJBRE1JTiJdLCJpYXQiOjE3ODY0NjI0NzYsImV4cCI6NDA3MDkwODgwMH0.i1Eex05a4aaiQM0PbSqFd4cA5Iy9MB5-xx-06f1m5y8", "type": "string" },
     { "key": "categoryId", "value": "", "type": "string" },
     { "key": "productId", "value": "", "type": "string" }
   ],
@@ -386,7 +386,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"200 OK\", () => pm.expect(pm.response.code).to.eql(200));"
+                  "pm.test(\"200 OK\", () => pm.expect(pm.response.code).to.eql(200));",
+                  "pm.test(\"items expose deleted state\", () => { const j = pm.response.json(); for (const it of j.items) { pm.expect(it).to.have.property('deleted'); pm.expect(it).to.have.property('deletedAt'); } });"
                 ]
               }
             }
@@ -451,7 +452,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"200 OK\", () => pm.expect(pm.response.code).to.eql(200));"
+                  "pm.test(\"200 OK\", () => pm.expect(pm.response.code).to.eql(200));",
+                  "pm.test(\"items expose deleted state\", () => { const j = pm.response.json(); for (const it of j.items) { pm.expect(it).to.have.property('deleted'); pm.expect(it).to.have.property('deletedAt'); } });"
                 ]
               }
             }

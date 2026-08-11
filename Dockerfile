@@ -2,7 +2,7 @@ FROM maven:3.9.9-eclipse-temurin-21 AS build
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /rally-common
-RUN git clone --depth 1 --branch v0.2.0 https://github.com/RallyDeals/rally-common.git .
+RUN git clone --depth 1 --branch main https://github.com/RallyDeals/rally-common.git .
 RUN mvn -B -q install -DskipTests
 
 WORKDIR /rally-catalog
