@@ -22,4 +22,6 @@ public class ProductResponse {
     private String rejectionReason;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private boolean deleted;
+    private LocalDateTime deletedAt;
 }

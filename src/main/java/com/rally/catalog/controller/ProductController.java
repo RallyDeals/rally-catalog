@@ -93,7 +93,7 @@ public class ProductController {
     public ResponseEntity<PageResponse<ProductResponse>> getSellerProducts(
             @PathVariable UUID sellerId,
             @RequestParam(required = false) ProductStatus status,
-            @RequestParam(defaultValue = "false") boolean includeDeleted,
+            @RequestParam(defaultValue = "true") boolean includeDeleted,
             @RequestParam(required = false) String sort,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit) {
@@ -104,7 +104,7 @@ public class ProductController {
     @GetMapping("/admin")
     public ResponseEntity<PageResponse<ProductResponse>> getAdminProducts(
             @RequestParam(required = false) ProductStatus status,
-            @RequestParam(defaultValue = "false") boolean includeDeleted,
+            @RequestParam(defaultValue = "true") boolean includeDeleted,
             @RequestParam(required = false) String sort,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit) {
