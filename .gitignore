@@ -33,3 +33,9 @@ build/
 
 ### Local-only personal notes (never push) ###
 SESSION-LOG.md
+
+### Runtime logs (never commit) ###
+*.log
+
+### Secrets (never commit) ###
+.env

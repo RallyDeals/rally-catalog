@@ -31,6 +31,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -53,6 +54,11 @@ class ProductServiceTest {
 
     private ProductService productService;
 
+    private static final UUID SELLER = UUID.fromString("11111111-1111-4111-8111-111111111111");
+    private static final UUID BUYER = UUID.fromString("22222222-2222-4222-8222-222222222222");
+    private static final UUID ADMIN = UUID.fromString("33333333-3333-4333-8333-333333333333");
+    private static final UUID OTHER = UUID.fromString("44444444-4444-4444-8444-444444444444");
+
     @BeforeEach
     void setUp() {
         productService = new ProductService(productRepository, categoryRepository, new CatalogMapperImpl());
@@ -66,7 +72,7 @@ class ProductServiceTest {
 
     private Product product(ProductStatus status) {
         Product product = new Product(
-                "seller-1", "Headphones", "Noise cancelling", category(),
+                SELLER.toString(), "Headphones", "Noise cancelling", category(),
                 new BigDecimal("79.99"), "https://cdn.example.com/img.jpg");
         product.setId("prod-1");
         product.setStatus(status);
@@ -88,10 +94,10 @@ class ProductServiceTest {
         request.setCategoryId("cat-1");
         request.setBasePrice(new BigDecimal("79.99"));
 
-        ProductResponse response = productService.createProduct("seller-1", request);
+        ProductResponse response = productService.createProduct(SELLER, request);
 
         assertEquals(ProductStatus.PENDING_APPROVAL, response.getStatus());
-        assertEquals("seller-1", response.getSellerId());
+        assertEquals("11111111-1111-4111-8111-111111111111", response.getSellerId());
         assertEquals("Electronics", response.getCategory().getName());
     }
 
@@ -104,7 +110,7 @@ class ProductServiceTest {
         request.setCategoryId("missing");
         request.setBasePrice(new BigDecimal("79.99"));
 
-        assertThrows(NotFoundException.class, () -> productService.createProduct("seller-1", request));
+        assertThrows(NotFoundException.class, () -> productService.createProduct(SELLER, request));
     }
 
     @Test
@@ -112,7 +118,7 @@ class ProductServiceTest {
         Product pending = product(ProductStatus.PENDING_APPROVAL);
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(pending));
 
-        assertThrows(NotFoundException.class, () -> productService.getProduct("prod-1", "BUYER", "buyer-1"));
+        assertThrows(NotFoundException.class, () -> productService.getProduct("prod-1", "BUYER", BUYER));
     }
 
     @Test
@@ -120,7 +126,7 @@ class ProductServiceTest {
         Product approved = product(ProductStatus.APPROVED);
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
 
-        ProductResponse response = productService.getProduct("prod-1", "BUYER", "buyer-1");
+        ProductResponse response = productService.getProduct("prod-1", "BUYER", BUYER);
 
         assertEquals("prod-1", response.getId());
     }
@@ -130,7 +136,7 @@ class ProductServiceTest {
         Product rejected = product(ProductStatus.REJECTED);
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(rejected));
 
-        ProductResponse response = productService.getProduct("prod-1", "SELLER", "seller-1");
+        ProductResponse response = productService.getProduct("prod-1", "SELLER", SELLER);
 
         assertEquals(ProductStatus.REJECTED, response.getStatus());
     }
@@ -140,7 +146,7 @@ class ProductServiceTest {
         Product pending = product(ProductStatus.PENDING_APPROVAL);
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(pending));
 
-        assertThrows(NotFoundException.class, () -> productService.getProduct("prod-1", "SELLER", "other-seller"));
+        assertThrows(NotFoundException.class, () -> productService.getProduct("prod-1", "SELLER", OTHER));
     }
 
     @Test
@@ -148,7 +154,7 @@ class ProductServiceTest {
         Product approved = product(ProductStatus.APPROVED);
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
 
-        ProductResponse response = productService.getProduct("prod-1", "SELLER", "other-seller");
+        ProductResponse response = productService.getProduct("prod-1", "SELLER", OTHER);
 
         assertEquals("prod-1", response.getId());
     }
@@ -158,7 +164,7 @@ class ProductServiceTest {
         Product pending = product(ProductStatus.PENDING_APPROVAL);
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(pending));
 
-        ProductResponse response = productService.getProduct("prod-1", "ADMIN", "admin-1");
+        ProductResponse response = productService.getProduct("prod-1", "ADMIN", ADMIN);
 
         assertEquals(ProductStatus.PENDING_APPROVAL, response.getStatus());
     }
@@ -172,7 +178,7 @@ class ProductServiceTest {
         ProductUpdateRequest request = new ProductUpdateRequest();
         request.setName("Headphones Pro");
 
-        ProductResponse response = productService.updateProduct("prod-1", "seller-1", request);
+        ProductResponse response = productService.updateProduct("prod-1", SELLER, request);
 
         assertEquals("Headphones Pro", response.getName());
         assertEquals(new BigDecimal("79.99"), response.getBasePrice());
@@ -189,7 +195,7 @@ class ProductServiceTest {
         ProductUpdateRequest request = new ProductUpdateRequest();
         request.setName("Headphones Pro");
 
-        ProductResponse response = productService.updateProduct("prod-1", "seller-1", request);
+        ProductResponse response = productService.updateProduct("prod-1", SELLER, request);
 
         assertEquals(ProductStatus.PENDING_APPROVAL, response.getStatus());
         assertEquals(null, response.getRejectionReason());
@@ -203,7 +209,7 @@ class ProductServiceTest {
         ProductUpdateRequest request = new ProductUpdateRequest();
         request.setName("Hijacked");
 
-        assertThrows(ProductNotOwnedException.class, () -> productService.updateProduct("prod-1", "other-seller", request));
+        assertThrows(ProductNotOwnedException.class, () -> productService.updateProduct("prod-1", OTHER, request));
     }
 
     @Test
@@ -215,7 +221,7 @@ class ProductServiceTest {
         ProductUpdateRequest request = new ProductUpdateRequest();
         request.setName("Headphones Pro");
 
-        assertThrows(GoneException.class, () -> productService.updateProduct("prod-1", "seller-1", request));
+        assertThrows(GoneException.class, () -> productService.updateProduct("prod-1", SELLER, request));
     }
 
     @Test
@@ -224,7 +230,7 @@ class ProductServiceTest {
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
         when(productRepository.save(any(Product.class))).thenReturn(approved);
 
-        productService.deleteProduct("prod-1", "seller-1");
+        productService.deleteProduct("prod-1", SELLER);
 
         assertNotNull(approved.getDeletedAt());
         verify(productRepository).save(approved);
@@ -236,7 +242,7 @@ class ProductServiceTest {
         approved.setDeletedAt(LocalDateTime.now());
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
 
-        assertThrows(GoneException.class, () -> productService.deleteProduct("prod-1", "seller-1"));
+        assertThrows(GoneException.class, () -> productService.deleteProduct("prod-1", SELLER));
         verify(productRepository, never()).save(any(Product.class));
     }
 
@@ -245,7 +251,7 @@ class ProductServiceTest {
         Product approved = product(ProductStatus.APPROVED);
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
 
-        assertThrows(ProductNotOwnedException.class, () -> productService.deleteProduct("prod-1", "other-seller"));
+        assertThrows(ProductNotOwnedException.class, () -> productService.deleteProduct("prod-1", OTHER));
     }
 
     @Test
@@ -329,7 +335,7 @@ class ProductServiceTest {
         Page<Product> page = new PageImpl<>(List.of(product(ProductStatus.APPROVED)));
         when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
 
-        PageResponse<ProductResponse> response = productService.listSellerProducts("seller-1", null, false, null, 1, 20);
+        PageResponse<ProductResponse> response = productService.listSellerProducts(SELLER, null, false, null, 1, 20);
 
         assertEquals(1, response.getItems().size());
     }

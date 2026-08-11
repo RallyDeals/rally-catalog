@@ -1,31 +1,30 @@
 {
   "info": {
     "name": "RallyDeals - Catalog Service",
-    "description": "# RallyDeals Catalog Service\n\nTest collection for the catalog service. Run it against the Dockerized service (`docker compose up -d --build` inside `rally-catalog`), base URL `http://localhost:8083`.\n\n## How the API Gateway injects identity\n\nThe gateway is the single entry point and owns JWT handling. Flow:\n\n1. Client sends `Authorization: Bearer <JWT>` to the API Gateway.\n2. Gateway **parses and validates** the JWT (rally-common `JwtService.parseAndValidate`; JWT is signed HMAC, not encrypted) and extracts `sub` (user id) + `roles` from the claims.\n3. Gateway strips the bearer token and **injects identity headers** before forwarding:\n   - `X-User-Id`  -> value of the JWT `sub` claim\n   - `X-User-Role` -> value of the JWT roles claim\n4. The catalog service never validates the token itself; it reads `X-User-Id` / `X-User-Role` and trusts them (they come only from the gateway).\n\nBecause the gateway is not deployed yet, every request below **simulates the gateway** by setting `X-User-Id` / `X-User-Role` directly (via collection variables). Swap `{{sellerRole}}` -> `{{adminRole}}` to exercise admin flows.\n\n## Seed data\n\nRun the requests in order: the **Categories -> Create Category** and **Products -> Create Product** requests save their generated ids into the `categoryId` / `productId` collection variables, so later requests run end-to-end.\n\n## Notes\n\n- `GET /products/{id}` returns `404` for buyers/non-owners and `200` for the owning seller, `ADMIN`, or when called with an `ADMIN` role header.\n- `GET /products` (buyer view) only returns `APPROVED` and non-deleted products.\n- Admin queue lives at `/products/admin` (see Admin Moderation folder).",
+    "description": "# RallyDeals Catalog Service\n\nTest collection for the catalog service, routed **through the API Gateway** (`http://localhost:8080`). The gateway must be running with `CATALOG_SERVICE_URI` pointing at the catalog service (`http://localhost:8083`).\n\n## Authentication\n\nEvery request below sends `Authorization: Bearer <JWT>`. The gateway **parses and validates** the JWT (rally-common `JwtService.parseAndValidate`; JWT is signed HMAC, not encrypted), strips it, and **injects identity headers** before forwarding:\n\n- `X-User-Id`  -> value of the JWT `sub` claim\n- `X-User-Role` -> value of the JWT roles claim\n\nThe catalog service never validates the token itself; it reads `X-User-Id` / `X-User-Role` and trusts them (they come only from the gateway).\n\nTo run this collection you need three tokens (one per role) from the Auth Service (`POST /auth/login`), stored in the collection variables:\n\n- `sellerJwt` -> a SELLER token (own products, categories)\n- `buyerJwt`  -> a BUYER token (browse approved products)\n- `adminJwt`  -> an ADMIN token (moderation, category writes)\n\nSet them once in the collection variables (or a Postman environment) before running.\n\n## Seed data\n\nRun the requests in order: the **Categories -> Create Category** and **Products -> Create Product** requests save their generated ids into the `categoryId` / `productId` collection variables, so later requests run end-to-end.\n\n## Notes\n\n- The tokens' `sub` must match the `sellerId` (`user-1`) and `buyerId` (`user-2`) collection variables — the create-product assertion checks `sellerId` equals `user-1`.\n- `GET /products/{id}` returns `404` for buyers/non-owners and `200` for the owning seller, `ADMIN`, or when called with an admin token.\n- `GET /products` (buyer view) only returns `APPROVED` and non-deleted products.\n- Admin queue lives at `/products/admin` (see Admin Moderation folder).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8083", "type": "string" },
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
     { "key": "sellerId", "value": "user-1", "type": "string" },
     { "key": "buyerId", "value": "user-2", "type": "string" },
-    { "key": "sellerRole", "value": "SELLER", "type": "string" },
-    { "key": "buyerRole", "value": "BUYER", "type": "string" },
-    { "key": "adminRole", "value": "ADMIN", "type": "string" },
+    { "key": "sellerJwt", "value": "", "type": "string" },
+    { "key": "buyerJwt", "value": "", "type": "string" },
+    { "key": "adminJwt", "value": "", "type": "string" },
     { "key": "categoryId", "value": "", "type": "string" },
     { "key": "productId", "value": "", "type": "string" }
   ],
   "item": [
     {
       "name": "Categories",
-      "description": "Category taxonomy CRUD. In production, write operations go through the gateway as an admin; the requests here set `X-User-Role: {{adminRole}}` to simulate that.",
+      "description": "Category taxonomy CRUD. In production, write operations go through the gateway as an admin; these requests send an admin JWT (`{{adminJwt}}`).",
       "item": [
         {
           "name": "Create Category",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-User-Id", "value": "{{sellerId}}" },
-              { "key": "X-User-Role", "value": "{{adminRole}}" }
+              { "key": "Authorization", "value": "Bearer {{adminJwt}}" }
             ],
             "body": {
               "mode": "raw",
@@ -56,7 +55,9 @@
           "name": "List Categories",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
+            ],
             "url": {
               "raw": "{{baseUrl}}/categories",
               "host": ["{{baseUrl}}"],
@@ -80,7 +81,9 @@
           "name": "Get Category by ID",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
+            ],
             "url": {
               "raw": "{{baseUrl}}/categories/{{categoryId}}",
               "host": ["{{baseUrl}}"],
@@ -105,8 +108,7 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "X-User-Id", "value": "{{sellerId}}" },
-              { "key": "X-User-Role", "value": "{{adminRole}}" }
+              { "key": "Authorization", "value": "Bearer {{adminJwt}}" }
             ],
             "body": {
               "mode": "raw",
@@ -136,8 +138,7 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "X-User-Id", "value": "{{sellerId}}" },
-              { "key": "X-User-Role", "value": "{{adminRole}}" }
+              { "key": "Authorization", "value": "Bearer {{adminJwt}}" }
             ],
             "url": {
               "raw": "{{baseUrl}}/categories/{{categoryId}}",
@@ -161,15 +162,14 @@
     },
     {
       "name": "Products",
-      "description": "Product lifecycle. `X-User-Id` is taken from the gateway-injected header, never from the request body (see `deal-service.md` §4.2 for the same rule).",
+      "description": "Product lifecycle. `X-User-Id` is taken from the gateway-injected header (derived from the JWT), never from the request body (see `deal-service.md` §4.2 for the same rule).",
       "item": [
         {
           "name": "Create Product (seller)",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-User-Id", "value": "{{sellerId}}" },
-              { "key": "X-User-Role", "value": "{{sellerRole}}" }
+              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
             ],
             "body": {
               "mode": "raw",
@@ -203,8 +203,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "X-User-Id", "value": "{{buyerId}}" },
-              { "key": "X-User-Role", "value": "{{buyerRole}}" }
+              { "key": "Authorization", "value": "Bearer {{buyerJwt}}" }
             ],
             "url": {
               "raw": "{{baseUrl}}/products?page=1&limit=20",
@@ -234,8 +233,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "X-User-Id", "value": "{{buyerId}}" },
-              { "key": "X-User-Role", "value": "{{buyerRole}}" }
+              { "key": "Authorization", "value": "Bearer {{buyerJwt}}" }
             ],
             "url": {
               "raw": "{{baseUrl}}/products?q=wireless&sort=createdAt:asc",
@@ -264,8 +262,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "X-User-Id", "value": "{{sellerId}}" },
-              { "key": "X-User-Role", "value": "{{sellerRole}}" }
+              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
             ],
             "url": {
               "raw": "{{baseUrl}}/products/{{productId}}",
@@ -290,8 +287,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "X-User-Id", "value": "{{buyerId}}" },
-              { "key": "X-User-Role", "value": "{{buyerRole}}" }
+              { "key": "Authorization", "value": "Bearer {{buyerJwt}}" }
             ],
             "url": {
               "raw": "{{baseUrl}}/products/{{productId}}",
@@ -316,8 +312,7 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "X-User-Id", "value": "{{sellerId}}" },
-              { "key": "X-User-Role", "value": "{{sellerRole}}" }
+              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
             ],
             "body": {
               "mode": "raw",
@@ -348,8 +343,7 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "X-User-Id", "value": "{{sellerId}}" },
-              { "key": "X-User-Role", "value": "{{sellerRole}}" }
+              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
             ],
             "url": {
               "raw": "{{baseUrl}}/products/{{productId}}",
@@ -364,7 +358,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"204 No Content\", () => pm.expect(pm.response.code).to.eql(204));",
-                  "pm.test(\"re-delete -> 410 Gone\", () => { pm.sendRequest({ url: pm.request.url.toString(), method: 'DELETE', header: { 'X-User-Id': pm.collectionVariables.get('sellerId'), 'X-User-Role': pm.collectionVariables.get('sellerRole') } }, (e, r) => pm.expect(r.code).to.eql(410)); });"
+                  "pm.test(\"re-delete -> 410 Gone\", () => { pm.sendRequest({ url: pm.request.url.toString(), method: 'DELETE', header: { 'Authorization': 'Bearer ' + pm.collectionVariables.get('sellerJwt') } }, (e, r) => pm.expect(r.code).to.eql(410)); });"
                 ]
               }
             }
@@ -375,8 +369,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "X-User-Id", "value": "{{sellerId}}" },
-              { "key": "X-User-Role", "value": "{{sellerRole}}" }
+              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
             ],
             "url": {
               "raw": "{{baseUrl}}/products/sellers/{{sellerId}}?includeDeleted=true",
@@ -403,7 +396,9 @@
           "name": "Lookup Products (Order Service)",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"productIds\": [\"{{productId}}\"]\n}",
@@ -432,15 +427,14 @@
     },
     {
       "name": "Admin Moderation",
-      "description": "Moderation lifecycle. These endpoints are routed to the gateway with an admin JWT; here we simulate the injected `X-User-Role: {{adminRole}}` header. (The docs define `/admin/products`, the implementation exposes `/products/admin`.)",
+      "description": "Moderation lifecycle. These endpoints are routed to the gateway with an admin JWT (`{{adminJwt}}`). (The docs define `/admin/products`, the implementation exposes `/products/admin`.)",
       "item": [
         {
           "name": "Admin Queue (pending)",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "X-User-Id", "value": "{{sellerId}}" },
-              { "key": "X-User-Role", "value": "{{adminRole}}" }
+              { "key": "Authorization", "value": "Bearer {{adminJwt}}" }
             ],
             "url": {
               "raw": "{{baseUrl}}/products/admin?status=PENDING_APPROVAL",
@@ -468,8 +462,7 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "X-User-Id", "value": "{{sellerId}}" },
-              { "key": "X-User-Role", "value": "{{adminRole}}" }
+              { "key": "Authorization", "value": "Bearer {{adminJwt}}" }
             ],
             "url": {
               "raw": "{{baseUrl}}/products/admin/{{productId}}/approve",
@@ -495,8 +488,7 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "X-User-Id", "value": "{{sellerId}}" },
-              { "key": "X-User-Role", "value": "{{adminRole}}" }
+              { "key": "Authorization", "value": "Bearer {{adminJwt}}" }
             ],
             "body": {
               "mode": "raw",

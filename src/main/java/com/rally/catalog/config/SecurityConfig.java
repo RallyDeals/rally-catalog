@@ -1,6 +1,5 @@
 package com.rally.catalog.config;
 
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -11,17 +10,9 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 public class SecurityConfig {
 
-    // ====================================================================
-    // ADMIN role filter — DISABLED until the Auth service is implemented.
-    // The catalog service does its own role filtering via AdminRoleFilter;
-    // enable it by uncommenting this bean (or the @Component on the class).
-    // ====================================================================
-    // @Bean
-    // public FilterRegistrationBean<AdminRoleFilter> adminRoleFilter() {
-    //     FilterRegistrationBean<AdminRoleFilter> bean = new FilterRegistrationBean<>(new AdminRoleFilter());
-    //     bean.addUrlPatterns("/products/admin/*");
-    //     return bean;
-    // }
+    // ADMIN enforcement for /products/admin/** lives in AdminRoleFilter (@Component,
+    // auto-registered). It reads the X-User-Role header the gateway injects after JWT
+    // validation and returns 403 for non-ADMIN callers (defense in depth).
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {

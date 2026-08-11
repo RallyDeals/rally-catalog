@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/products")
@@ -37,7 +38,7 @@ public class ProductController {
 
     @PostMapping
     public ResponseEntity<ProductResponse> createProduct(
-            @RequestHeader("X-User-Id") String sellerId,
+            @RequestHeader("X-User-Id") UUID sellerId,
             @Valid @RequestBody ProductRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(productService.createProduct(sellerId, request));
@@ -47,7 +48,7 @@ public class ProductController {
     public ResponseEntity<PageResponse<ProductResponse>> browseOrSearch(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String categoryId,
-            @RequestParam(required = false) String sellerId,
+            @RequestParam(required = false) UUID sellerId,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(required = false) String sort,
@@ -61,14 +62,14 @@ public class ProductController {
     public ResponseEntity<ProductResponse> getProduct(
             @PathVariable String id,
             @RequestHeader(value = "X-User-Role", required = false) String role,
-            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId) {
         return ResponseEntity.ok(productService.getProduct(id, role, userId));
     }
 
     @PatchMapping("/{id}")
     public ResponseEntity<ProductResponse> updateProduct(
             @PathVariable String id,
-            @RequestHeader("X-User-Id") String sellerId,
+            @RequestHeader("X-User-Id") UUID sellerId,
             @Valid @RequestBody ProductUpdateRequest request) {
         return ResponseEntity.ok(productService.updateProduct(id, sellerId, request));
     }
@@ -76,7 +77,7 @@ public class ProductController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(
             @PathVariable String id,
-            @RequestHeader("X-User-Id") String sellerId) {
+            @RequestHeader("X-User-Id") UUID sellerId) {
         productService.deleteProduct(id, sellerId);
         return ResponseEntity.noContent().build();
     }
@@ -89,7 +90,7 @@ public class ProductController {
 
     @GetMapping("/sellers/{sellerId}")
     public ResponseEntity<PageResponse<ProductResponse>> getSellerProducts(
-            @PathVariable String sellerId,
+            @PathVariable UUID sellerId,
             @RequestParam(required = false) ProductStatus status,
             @RequestParam(defaultValue = "false") boolean includeDeleted,
             @RequestParam(required = false) String sort,

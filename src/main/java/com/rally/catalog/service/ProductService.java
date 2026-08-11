@@ -32,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -53,10 +54,10 @@ public class ProductService {
         this.catalogMapper = catalogMapper;
     }
 
-    public ProductResponse createProduct(String sellerId, ProductRequest request) {
+    public ProductResponse createProduct(UUID sellerId, ProductRequest request) {
         Category category = findCategory(request.getCategoryId());
         Product product = new Product(
-                sellerId,
+                sellerId.toString(),
                 request.getName(),
                 request.getDescription(),
                 category,
@@ -68,25 +69,26 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> searchProducts(
-            String q, String categoryId, String sellerId,
+            String q, String categoryId, UUID sellerId,
             BigDecimal minPrice, BigDecimal maxPrice,
             String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
         Specification<Product> spec = Specification.where(ProductSpecifications.approvedAndNotDeleted())
                 .and(ProductSpecifications.keyword(q))
                 .and(ProductSpecifications.categoryIs(categoryId))
-                .and(ProductSpecifications.sellerIs(sellerId))
+                .and(ProductSpecifications.sellerIs(sellerId == null ? null : sellerId.toString()))
                 .and(ProductSpecifications.priceBetween(minPrice, maxPrice));
         return toPageResponse(productRepository.findAll(spec, pageable));
     }
 
     @Transactional(readOnly = true)
-    public ProductResponse getProduct(String id, String viewerRole, String viewerId) {
+    public ProductResponse getProduct(String id, String viewerRole, UUID viewerId) {
         Product product = findById(id);
         if (ROLE_ADMIN.equals(viewerRole)) {
             return catalogMapper.toProductResponse(product);
         }
-        if (ROLE_SELLER.equals(viewerRole) && product.getSellerId().equals(viewerId)) {
+        if (ROLE_SELLER.equals(viewerRole) && viewerId != null
+                && product.getSellerId().equals(viewerId.toString())) {
             return catalogMapper.toProductResponse(product);
         }
         if (product.getStatus() == ProductStatus.APPROVED && !product.isDeleted()) {
@@ -95,8 +97,8 @@ public class ProductService {
         throw new ProductNotFoundException(id);
     }
 
-    public ProductResponse updateProduct(String id, String sellerId, ProductUpdateRequest request) {
-        Product product = findOwned(id, sellerId);
+    public ProductResponse updateProduct(String id, UUID sellerId, ProductUpdateRequest request) {
+        Product product = findOwned(id, sellerId.toString());
         if (product.isDeleted()) {
             throw new GoneException("Product already deleted");
         }
@@ -114,8 +116,8 @@ public class ProductService {
         return catalogMapper.toProductResponse(productRepository.save(product));
     }
 
-    public void deleteProduct(String id, String sellerId) {
-        Product product = findOwned(id, sellerId);
+    public void deleteProduct(String id, UUID sellerId) {
+        Product product = findOwned(id, sellerId.toString());
         if (product.isDeleted()) {
             throw new GoneException("Product already deleted");
         }
@@ -148,10 +150,10 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> listSellerProducts(
-            String sellerId, ProductStatus status, boolean includeDeleted,
+            UUID sellerId, ProductStatus status, boolean includeDeleted,
             String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
-        Specification<Product> spec = Specification.where(ProductSpecifications.sellerIs(sellerId))
+        Specification<Product> spec = Specification.where(ProductSpecifications.sellerIs(sellerId.toString()))
                 .and(ProductSpecifications.statusIs(status))
                 .and(ProductSpecifications.notDeleted(includeDeleted));
         return toPageResponse(productRepository.findAll(spec, pageable));
