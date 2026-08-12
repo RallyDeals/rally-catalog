@@ -1,6 +1,8 @@
 package com.rally.catalog.entity;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -10,6 +12,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -19,6 +22,8 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -50,6 +55,12 @@ public class Product {
 
     @Column(name = "image_url", length = 500)
     private String imageUrl;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "product_images", joinColumns = @JoinColumn(name = "product_id"))
+    @OrderColumn(name = "images_order")
+    @Column(name = "image_url", length = 500)
+    private List<String> images = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

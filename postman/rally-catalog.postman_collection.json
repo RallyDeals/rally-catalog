@@ -1,522 +1,770 @@
 {
-  "info": {
-    "name": "RallyDeals - Catalog Service",
-    "description": "# RallyDeals Catalog Service\n\nTest collection for the catalog service, routed **through the API Gateway** (`http://localhost:8080`). The gateway must be running with `CATALOG_SERVICE_URI` pointing at the catalog service (`http://localhost:8083`).\n\n## Authentication\n\nEvery request below sends `Authorization: Bearer <JWT>`. The gateway **parses and validates** the JWT (rally-common `JwtService.parseAndValidate`; JWT is signed HMAC, not encrypted), strips it, and **injects identity headers** before forwarding:\n\n- `X-User-Id`  -> value of the JWT `sub` claim\n- `X-User-Role` -> value of the JWT roles claim\n\nThe catalog service never validates the token itself; it reads `X-User-Id` / `X-User-Role` and trusts them (they come only from the gateway).\n\nThe collection ships with **pre-generated static dev tokens** (expire 2099) in the `sellerJwt` / `buyerJwt` / `adminJwt` collection variables, signed with the canonical dev `JWT_SECRET`: `/Wepykoli0z1033egoGDdLrm3eohJiOJUxT5L/RxgV0=`. They work against the locally running gateway with no Auth Service up. To regenerate, sign an HS256 JWT with that secret, matching the `sub`/`iss`/`roles` shape `JwtService` expects:\n\n- `sellerJwt` -> sub `11111111-1111-1111-1111-111111111111` (a UUID, since the catalog reads `X-User-Id` as a UUID), roles `[\"SELLER\"]`\n- `buyerJwt`  -> sub `22222222-2222-2222-2222-222222222222`, roles `[\"BUYER\"]`\n- `adminJwt`  -> sub `33333333-3333-3333-3333-333333333333`, roles `[\"ADMIN\"]`\n- `iss` = `rally-auth-service`, plus `iat`/`exp`\n\n> **Note:** if you get 401s, the gateway process is running with a *different* `JWT_SECRET` than this canonical value. Restart it so it re-reads `rally-gateway/.env`.\n\n## Seed data\n\nRun the requests in order: the **Categories -> Create Category** and **Products -> Create Product** requests save their generated ids into the `categoryId` / `productId` collection variables, so later requests run end-to-end.\n\n## Notes\n\n- The tokens' `sub` must match the `sellerId` (`user-1`) and `buyerId` (`user-2`) collection variables — the create-product assertion checks `sellerId` equals `user-1`.\n- `GET /products/{id}` returns `404` for buyers/non-owners and `200` for the owning seller, `ADMIN`, or when called with an admin token.\n- `GET /products` (buyer view) only returns `APPROVED` and non-deleted products.\n- `GET /products/sellers/{sellerId}` and `GET /products/admin` include soft-deleted products by default (`includeDeleted` defaults to `true`); responses expose `deleted` / `deletedAt` so you can tell them apart.\n- Admin queue lives at `/products/admin` (see Admin Moderation folder).",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
-    { "key": "sellerId", "value": "11111111-1111-1111-1111-111111111111", "type": "string" },
-    { "key": "buyerId", "value": "22222222-2222-2222-2222-222222222222", "type": "string" },
-    { "key": "sellerJwt", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTEiLCJpc3MiOiJyYWxseS1hdXRoLXNlcnZpY2UiLCJyb2xlcyI6WyJTRUxMRVIiXSwiaWF0IjoxNzg2NDY0NDYxLCJleHAiOjQwNzA5MDg4MDB9.0CZTJXO38hOTOVFRnl2NWn0KYDAWoEPXR5ovIKlw1Ks", "type": "string" },
-    { "key": "buyerJwt", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMjIyMjIyMi0yMjIyLTIyMjItMjIyMi0yMjIyMjIyMjIyMjIiLCJpc3MiOiJyYWxseS1hdXRoLXNlcnZpY2UiLCJyb2xlcyI6WyJCVVlFUiJdLCJpYXQiOjE3ODY0NjQ0NzcsImV4cCI6NDA3MDkwODgwMH0.8gxHGHlvgZvdF8CLWTBwoFtJqiLI65-vQb3C1bUYh-s", "type": "string" },
-    { "key": "adminJwt", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzMzMzMzMy0zMzMzLTMzMzMtMzMzMy0zMzMzMzMzMzMzMzMiLCJpc3MiOiJyYWxseS1hdXRoLXNlcnZpY2UiLCJyb2xlcyI6WyJBRE1JTiJdLCJpYXQiOjE3ODY0NjQ0NjEsImV4cCI6NDA3MDkwODgwMH0.KyBKAgNPsFdSRUb4bBVTiTkw1i58L8Gpl-h25SUp9Ig", "type": "string" },
-    { "key": "categoryId", "value": "", "type": "string" },
-    { "key": "productId", "value": "", "type": "string" }
-  ],
-  "item": [
-    {
-      "name": "Categories",
-      "description": "Category taxonomy CRUD. In production, write operations go through the gateway as an admin; these requests send an admin JWT (`{{adminJwt}}`).",
-      "item": [
-        {
-          "name": "Create Category",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{adminJwt}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Electronics\",\n  \"description\": \"Gadgets, audio and devices\"\n}",
-              "options": { "raw": { "language": "json" } }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/categories",
-              "host": ["{{baseUrl}}"],
-              "path": ["categories"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"201 Created\", () => pm.expect(pm.response.code).to.eql(201));",
-                  "const j = pm.response.json();",
-                  "pm.collectionVariables.set(\"categoryId\", j.id);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "List Categories",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/categories",
-              "host": ["{{baseUrl}}"],
-              "path": ["categories"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK\", () => pm.expect(pm.response.code).to.eql(200));",
-                  "pm.test(\"body is array\", () => pm.expect(pm.response.json()).to.be.an('array'));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Get Category by ID",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/categories/{{categoryId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["categories", "{{categoryId}}"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK\", () => pm.expect(pm.response.code).to.eql(200));",
-                  "pm.test(\"returns requested id\", () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"categoryId\")));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Update Category",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{adminJwt}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Electronics & Accessories\"\n}",
-              "options": { "raw": { "language": "json" } }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/categories/{{categoryId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["categories", "{{categoryId}}"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK\", () => pm.expect(pm.response.code).to.eql(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Delete Category (has products -> 400)",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{adminJwt}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/categories/{{categoryId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["categories", "{{categoryId}}"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"409/400 expected while products reference it\", () => pm.expect([400, 204]).to.include(pm.response.code));"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "Products",
-      "description": "Product lifecycle. `X-User-Id` is taken from the gateway-injected header (derived from the JWT), never from the request body (see `deal-service.md` §4.2 for the same rule).",
-      "item": [
-        {
-          "name": "Create Product (seller)",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Wireless Headphones\",\n  \"description\": \"Noise cancelling over-ear headphones\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"basePrice\": 99.99,\n  \"imageUrl\": \"https://example.com/headphones.jpg\"\n}",
-              "options": { "raw": { "language": "json" } }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/products",
-              "host": ["{{baseUrl}}"],
-              "path": ["products"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"201 Created\", () => pm.expect(pm.response.code).to.eql(201));",
-                  "const j = pm.response.json();",
-                  "pm.test(\"starts PENDING_APPROVAL\", () => pm.expect(j.status).to.eql(\"PENDING_APPROVAL\"));",
-                  "pm.test(\"sellerId from header\", () => pm.expect(j.sellerId).to.eql(pm.collectionVariables.get(\"sellerId\")));",
-                  "pm.collectionVariables.set(\"productId\", j.id);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Browse Products (buyer view)",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{buyerJwt}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/products?page=1&limit=20",
-              "host": ["{{baseUrl}}"],
-              "path": ["products"],
-              "query": [
-                { "key": "page", "value": "1" },
-                { "key": "limit", "value": "20" }
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK\", () => pm.expect(pm.response.code).to.eql(200));",
-                  "pm.test(\"paginated response shape\", () => { const j = pm.response.json(); pm.expect(j).to.have.property('items'); pm.expect(j).to.have.property('total'); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Search Products (q + sort + filter)",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{buyerJwt}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/products?q=wireless&sort=createdAt:asc",
-              "host": ["{{baseUrl}}"],
-              "path": ["products"],
-              "query": [
-                { "key": "q", "value": "wireless" },
-                { "key": "sort", "value": "createdAt:asc" }
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK\", () => pm.expect(pm.response.code).to.eql(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Get Product (seller owner -> 200)",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/products/{{productId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["products", "{{productId}}"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK for owner\", () => pm.expect(pm.response.code).to.eql(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Get Product (buyer non-owner -> 404)",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{buyerJwt}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/products/{{productId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["products", "{{productId}}"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"404 for non-owner (product hidden)\", () => pm.expect(pm.response.code).to.eql(404));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Update Product (seller)",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Wireless Headphones Pro\",\n  \"basePrice\": 129.99\n}",
-              "options": { "raw": { "language": "json" } }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/products/{{productId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["products", "{{productId}}"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK\", () => pm.expect(pm.response.code).to.eql(200));",
-                  "pm.test(\"update resets to PENDING_APPROVAL\", () => pm.expect(pm.response.json().status).to.eql(\"PENDING_APPROVAL\"));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Delete Product (seller, soft delete)",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/products/{{productId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["products", "{{productId}}"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"204 No Content\", () => pm.expect(pm.response.code).to.eql(204));",
-                  "pm.test(\"re-delete -> 410 Gone\", () => { pm.sendRequest({ url: pm.request.url.toString(), method: 'DELETE', header: { 'Authorization': 'Bearer ' + pm.collectionVariables.get('sellerJwt') } }, (e, r) => pm.expect(r.code).to.eql(410)); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "List Seller Products",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/products/sellers/{{sellerId}}?includeDeleted=true",
-              "host": ["{{baseUrl}}"],
-              "path": ["products", "sellers", "{{sellerId}}"],
-              "query": [
-                { "key": "includeDeleted", "value": "true" }
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK\", () => pm.expect(pm.response.code).to.eql(200));",
-                  "pm.test(\"items expose deleted state\", () => { const j = pm.response.json(); for (const it of j.items) { pm.expect(it).to.have.property('deleted'); pm.expect(it).to.have.property('deletedAt'); } });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Lookup Products (Order Service)",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"productIds\": [\"{{productId}}\"]\n}",
-              "options": { "raw": { "language": "json" } }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/products/lookup",
-              "host": ["{{baseUrl}}"],
-              "path": ["products", "lookup"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK\", () => pm.expect(pm.response.code).to.eql(200));",
-                  "pm.test(\"found/notFound split\", () => { const j = pm.response.json(); pm.expect(j).to.have.property('found'); pm.expect(j).to.have.property('notFound'); });"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "Admin Moderation",
-      "description": "Moderation lifecycle. These endpoints are routed to the gateway with an admin JWT (`{{adminJwt}}`). (The docs define `/admin/products`, the implementation exposes `/products/admin`.)",
-      "item": [
-        {
-          "name": "Admin Queue (pending)",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{adminJwt}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/products/admin?status=PENDING_APPROVAL",
-              "host": ["{{baseUrl}}"],
-              "path": ["products", "admin"],
-              "query": [
-                { "key": "status", "value": "PENDING_APPROVAL" }
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK\", () => pm.expect(pm.response.code).to.eql(200));",
-                  "pm.test(\"items expose deleted state\", () => { const j = pm.response.json(); for (const it of j.items) { pm.expect(it).to.have.property('deleted'); pm.expect(it).to.have.property('deletedAt'); } });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Approve Product",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{adminJwt}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/products/admin/{{productId}}/approve",
-              "host": ["{{baseUrl}}"],
-              "path": ["products", "admin", "{{productId}}", "approve"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK\", () => pm.expect(pm.response.code).to.eql(200));",
-                  "pm.test(\"status APPROVED\", () => pm.expect(pm.response.json().status).to.eql(\"APPROVED\"));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Reject Product",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{adminJwt}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"reason\": \"Price above allowed margin\"\n}",
-              "options": { "raw": { "language": "json" } }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/products/admin/{{productId}}/reject",
-              "host": ["{{baseUrl}}"],
-              "path": ["products", "admin", "{{productId}}", "reject"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK\", () => pm.expect(pm.response.code).to.eql(200));",
-                  "pm.test(\"status REJECTED\", () => pm.expect(pm.response.json().status).to.eql(\"REJECTED\"));"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    }
-  ]
+    "info":  {
+                 "name":  "RallyDeals - Catalog Service",
+                 "description":  "# RallyDeals Catalog Service\n\nTest collection for the catalog service, routed **through the API Gateway** (`http://localhost:8080`). The gateway must be running with `CATALOG_SERVICE_URI` pointing at the catalog service (`http://localhost:8083`).\n\n## Authentication\n\nEvery request below sends `Authorization: Bearer \u003cJWT\u003e`. The gateway **parses and validates** the JWT (rally-common `JwtService.parseAndValidate`; JWT is signed HMAC, not encrypted), strips it, and **injects identity headers** before forwarding:\n\n- `X-User-Id`  -\u003e value of the JWT `sub` claim\n- `X-User-Role` -\u003e value of the JWT roles claim\n\nThe catalog service never validates the token itself; it reads `X-User-Id` / `X-User-Role` and trusts them (they come only from the gateway).\n\nThe collection ships with **pre-generated static dev tokens** (expire 2099) in the `sellerJwt` / `buyerJwt` / `adminJwt` collection variables, signed with the canonical dev `JWT_SECRET`: `/Wepykoli0z1033egoGDdLrm3eohJiOJUxT5L/RxgV0=`. They work against the locally running gateway with no Auth Service up. To regenerate, sign an HS256 JWT with that secret, matching the `sub`/`iss`/`roles` shape `JwtService` expects:\n\n- `sellerJwt` -\u003e sub `11111111-1111-1111-1111-111111111111` (a UUID, since the catalog reads `X-User-Id` as a UUID), roles `[\"SELLER\"]`\n- `buyerJwt`  -\u003e sub `22222222-2222-2222-2222-222222222222`, roles `[\"BUYER\"]`\n- `adminJwt`  -\u003e sub `33333333-3333-3333-3333-333333333333`, roles `[\"ADMIN\"]`\n- `iss` = `rally-auth-service`, plus `iat`/`exp`\n\n\u003e **Note:** if you get 401s, the gateway process is running with a *different* `JWT_SECRET` than this canonical value. Restart it so it re-reads `rally-gateway/.env`.\n\n## Seed data\n\nRun the requests in order: the **Categories -\u003e Create Category** and **Products -\u003e Create Product** requests save their generated ids into the `categoryId` / `productId` collection variables, so later requests run end-to-end.\n\n## Notes\n\n- The tokens\u0027 `sub` must match the `sellerId` (`user-1`) and `buyerId` (`user-2`) collection variables Ã¢â‚¬â€ the create-product assertion checks `sellerId` equals `user-1`.\n- `GET /products/{id}` returns `404` for buyers/non-owners and `200` for the owning seller, `ADMIN`, or when called with an admin token.\n- `GET /products` (buyer view) only returns `APPROVED` and non-deleted products.\n- `GET /products/sellers/{sellerId}` and `GET /products/admin` include soft-deleted products by default (`includeDeleted` defaults to `true`); responses expose `deleted` / `deletedAt` so you can tell them apart.\n- Admin queue lives at `/products/admin` (see Admin Moderation folder).",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+             },
+    "variable":  [
+                     {
+                         "key":  "baseUrl",
+                         "value":  "http://localhost:8080",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "sellerId",
+                         "value":  "11111111-1111-1111-1111-111111111111",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "buyerId",
+                         "value":  "22222222-2222-2222-2222-222222222222",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "sellerJwt",
+                         "value":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTEiLCJpc3MiOiJyYWxseS1hdXRoLXNlcnZpY2UiLCJyb2xlcyI6WyJTRUxMRVIiXSwiaWF0IjoxNzg2NDY0NDYxLCJleHAiOjQwNzA5MDg4MDB9.0CZTJXO38hOTOVFRnl2NWn0KYDAWoEPXR5ovIKlw1Ks",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "buyerJwt",
+                         "value":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMjIyMjIyMi0yMjIyLTIyMjItMjIyMi0yMjIyMjIyMjIyMjIiLCJpc3MiOiJyYWxseS1hdXRoLXNlcnZpY2UiLCJyb2xlcyI6WyJCVVlFUiJdLCJpYXQiOjE3ODY0NjQ0NzcsImV4cCI6NDA3MDkwODgwMH0.8gxHGHlvgZvdF8CLWTBwoFtJqiLI65-vQb3C1bUYh-s",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "adminJwt",
+                         "value":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzMzMzMzMy0zMzMzLTMzMzMtMzMzMy0zMzMzMzMzMzMzMzMiLCJpc3MiOiJyYWxseS1hdXRoLXNlcnZpY2UiLCJyb2xlcyI6WyJBRE1JTiJdLCJpYXQiOjE3ODY0NjQ0NjEsImV4cCI6NDA3MDkwODgwMH0.KyBKAgNPsFdSRUb4bBVTiTkw1i58L8Gpl-h25SUp9Ig",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "categoryId",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "productId",
+                         "value":  "",
+                         "type":  "string"
+                     }
+                 ],
+    "item":  [
+                 {
+                     "name":  "Categories",
+                     "description":  "Category taxonomy CRUD. In production, write operations go through the gateway as an admin; these requests send an admin JWT (`{{adminJwt}}`).",
+                     "item":  [
+                                  {
+                                      "name":  "Create Category",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminJwt}}"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"name\": \"{{categoryName}}\",\n  \"description\": \"Gadgets, audio and devices\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/categories",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "categories"
+                                                                           ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "prerequest",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.collectionVariables.set(\"categoryName\", \"Test-Cat-\" + Date.now());"
+                                                                                ]
+                                                                   }
+                                                    },
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"201 Created\", () =\u003e pm.expect(pm.response.code).to.eql(201));",
+                                                                                    "const j = pm.response.json();",
+                                                                                    "pm.collectionVariables.set(\"categoryId\", j.id);"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "List Categories",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{sellerJwt}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/categories",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "categories"
+                                                                           ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"200 OK\", () =\u003e pm.expect(pm.response.code).to.eql(200));",
+                                                                                    "pm.test(\"body is array\", () =\u003e pm.expect(pm.response.json()).to.be.an(\u0027array\u0027));"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Get Category by ID",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{sellerJwt}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/categories/{{categoryId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "categories",
+                                                                               "{{categoryId}}"
+                                                                           ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"200 OK\", () =\u003e pm.expect(pm.response.code).to.eql(200));",
+                                                                                    "pm.test(\"returns requested id\", () =\u003e pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"categoryId\")));"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Update Category",
+                                      "request":  {
+                                                      "method":  "PATCH",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminJwt}}"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"name\": \"{{updatedCategoryName}}\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/categories/{{categoryId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "categories",
+                                                                               "{{categoryId}}"
+                                                                           ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "prerequest",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                                                                                      "pm.collectionVariables.set(\"updatedCategoryName\", \"Electronics \u0026 Accessories-\" + Date.now());"
+                                                                                                                                                  ]
+                                                                   }
+                                                    },
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"200 OK\", () =\u003e pm.expect(pm.response.code).to.eql(200));"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Products",
+                     "description":  "Product lifecycle. `X-User-Id` is taken from the gateway-injected header (derived from the JWT), never from the request body (see `deal-service.md` Ã‚Â§4.2 for the same rule).",
+                     "item":  [
+                                  {
+                                      "name":  "Create Product (seller)",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{sellerJwt}}"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"name\": \"Wireless Headphones\",\n  \"description\": \"Noise cancelling over-ear headphones\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"basePrice\": 99.99,\n  \"imageUrl\": \"https://example.com/headphones.jpg\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/products",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "products"
+                                                                           ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"201 Created\", () =\u003e pm.expect(pm.response.code).to.eql(201));",
+                                                                                    "const j = pm.response.json();",
+                                                                                    "pm.test(\"starts PENDING_APPROVAL\", () =\u003e pm.expect(j.status).to.eql(\"PENDING_APPROVAL\"));",
+                                                                                    "pm.test(\"sellerId from header\", () =\u003e pm.expect(j.sellerId).to.eql(pm.collectionVariables.get(\"sellerId\")));",
+                                                                                    "pm.collectionVariables.set(\"productId\", j.id);"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Browse Products (buyer view)",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{buyerJwt}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/products?page=1\u0026limit=20",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "products"
+                                                                           ],
+                                                                  "query":  [
+                                                                                {
+                                                                                    "key":  "page",
+                                                                                    "value":  "1"
+                                                                                },
+                                                                                {
+                                                                                    "key":  "limit",
+                                                                                    "value":  "20"
+                                                                                }
+                                                                            ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"200 OK\", () =\u003e pm.expect(pm.response.code).to.eql(200));",
+                                                                                    "pm.test(\"paginated response shape\", () =\u003e { const j = pm.response.json(); pm.expect(j).to.have.property(\u0027items\u0027); pm.expect(j).to.have.property(\u0027total\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Search Products (q + sort + filter)",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{buyerJwt}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/products?q=wireless\u0026sort=createdAt:asc",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "products"
+                                                                           ],
+                                                                  "query":  [
+                                                                                {
+                                                                                    "key":  "q",
+                                                                                    "value":  "wireless"
+                                                                                },
+                                                                                {
+                                                                                    "key":  "sort",
+                                                                                    "value":  "createdAt:asc"
+                                                                                }
+                                                                            ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"200 OK\", () =\u003e pm.expect(pm.response.code).to.eql(200));"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Get Product (seller owner -\u003e 200)",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{sellerJwt}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/products/{{productId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "products",
+                                                                               "{{productId}}"
+                                                                           ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"200 OK for owner\", () =\u003e pm.expect(pm.response.code).to.eql(200));"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Get Product (buyer non-owner -\u003e 404)",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{buyerJwt}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/products/{{productId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "products",
+                                                                               "{{productId}}"
+                                                                           ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"404 for non-owner (product hidden)\", () =\u003e pm.expect(pm.response.code).to.eql(404));"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Update Product (seller)",
+                                      "request":  {
+                                                      "method":  "PATCH",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{sellerJwt}}"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"name\": \"Wireless Headphones Pro\",\n  \"basePrice\": 129.99\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/products/{{productId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "products",
+                                                                               "{{productId}}"
+                                                                           ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"200 OK\", () =\u003e pm.expect(pm.response.code).to.eql(200));",
+                                                                                    "pm.test(\"update resets to PENDING_APPROVAL\", () =\u003e pm.expect(pm.response.json().status).to.eql(\"PENDING_APPROVAL\"));"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Delete Product (seller, soft delete)",
+                                      "request":  {
+                                                      "method":  "DELETE",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{sellerJwt}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/products/{{productId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "products",
+                                                                               "{{productId}}"
+                                                                           ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"204 No Content\", () =\u003e pm.expect(pm.response.code).to.eql(204));",
+                                                                                    "pm.test(\"re-delete -\u003e 410 Gone\", () =\u003e { pm.sendRequest({ url: pm.request.url.toString(), method: \u0027DELETE\u0027, header: { \u0027Authorization\u0027: \u0027Bearer \u0027 + pm.collectionVariables.get(\u0027sellerJwt\u0027) } }, (e, r) =\u003e pm.expect(r.code).to.eql(410)); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "List Seller Products",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{sellerJwt}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/products/sellers/{{sellerId}}?includeDeleted=true",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "products",
+                                                                               "sellers",
+                                                                               "{{sellerId}}"
+                                                                           ],
+                                                                  "query":  [
+                                                                                {
+                                                                                    "key":  "includeDeleted",
+                                                                                    "value":  "true"
+                                                                                }
+                                                                            ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"200 OK\", () =\u003e pm.expect(pm.response.code).to.eql(200));",
+                                                                                    "pm.test(\"items expose deleted state\", () =\u003e { const j = pm.response.json(); for (const it of j.items) { pm.expect(it).to.have.property(\u0027deleted\u0027); pm.expect(it).to.have.property(\u0027deletedAt\u0027); } });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Lookup Products (Order Service)",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{sellerJwt}}"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"productIds\": [\"{{productId}}\"]\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/products/lookup",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "products",
+                                                                               "lookup"
+                                                                           ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"200 OK\", () =\u003e pm.expect(pm.response.code).to.eql(200));",
+                                                                                    "pm.test(\"found/notFound split\", () =\u003e { const j = pm.response.json(); pm.expect(j).to.have.property(\u0027found\u0027); pm.expect(j).to.have.property(\u0027notFound\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Admin Moderation",
+                     "description":  "Moderation lifecycle. These endpoints are routed to the gateway with an admin JWT (`{{adminJwt}}`). (The docs define `/admin/products`, the implementation exposes `/products/admin`.)",
+                     "item":  [
+                                  {
+                                      "name":  "Admin Queue (pending)",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminJwt}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/products/admin?status=PENDING_APPROVAL",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "products",
+                                                                               "admin"
+                                                                           ],
+                                                                  "query":  [
+                                                                                {
+                                                                                    "key":  "status",
+                                                                                    "value":  "PENDING_APPROVAL"
+                                                                                }
+                                                                            ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"200 OK\", () =\u003e pm.expect(pm.response.code).to.eql(200));",
+                                                                                    "pm.test(\"items expose deleted state\", () =\u003e { const j = pm.response.json(); for (const it of j.items) { pm.expect(it).to.have.property(\u0027deleted\u0027); pm.expect(it).to.have.property(\u0027deletedAt\u0027); } });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Approve Product",
+                                      "request":  {
+                                                      "method":  "PATCH",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminJwt}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/products/admin/{{productId}}/approve",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "products",
+                                                                               "admin",
+                                                                               "{{productId}}",
+                                                                               "approve"
+                                                                           ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"200 OK\", () =\u003e pm.expect(pm.response.code).to.eql(200));",
+                                                                                    "pm.test(\"status APPROVED\", () =\u003e pm.expect(pm.response.json().status).to.eql(\"APPROVED\"));"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Reject Product",
+                                      "request":  {
+                                                      "method":  "PATCH",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminJwt}}"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"reason\": \"Price above allowed margin\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/products/admin/{{productId}}/reject",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "products",
+                                                                               "admin",
+                                                                               "{{productId}}",
+                                                                               "reject"
+                                                                           ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "prerequest",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "const categoryId = pm.collectionVariables.get(\"categoryId\");",
+                                                                                    "const sellerJwt = pm.collectionVariables.get(\"sellerJwt\");",
+                                                                                    "const baseUrl = pm.collectionVariables.get(\"baseUrl\");",
+                                                                                    "pm.sendRequest({",
+                                                                                    "  url: baseUrl + \"/products\",",
+                                                                                    "  method: \"POST\",",
+                                                                                    "  header: { \"Content-Type\": \"application/json\", \"Authorization\": \"Bearer \" + sellerJwt },",
+                                                                                    "  body: { mode: \"raw\", raw: JSON.stringify({ name: \"Reject-Probe-\" + Date.now(), description: \"for reject flow\", categoryId: categoryId, basePrice: 9.99 }) }",
+                                                                                    "}, (err, res) =\u003e {",
+                                                                                    "  if (err) { console.log(err); return; }",
+                                                                                    "  pm.collectionVariables.set(\"productId\", res.json().id);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    },
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"200 OK\", () =\u003e pm.expect(pm.response.code).to.eql(200));",
+                                                                                    "pm.test(\"status REJECTED\", () =\u003e pm.expect(pm.response.json().status).to.eql(\"REJECTED\"));"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Delete Category (has products -\u003e 400)",
+                                      "request":  {
+                                                      "method":  "DELETE",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminJwt}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/categories/{{categoryId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "categories",
+                                                                               "{{categoryId}}"
+                                                                           ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"409/400 expected while products reference it\", () =\u003e pm.expect([400, 204]).to.include(pm.response.code));"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 }
+             ]
 }

@@ -2,9 +2,24 @@ rally:
   jwt:
     secret: ${JWT_SECRET:/Wepykoli0z1033egoGDdLrm3eohJiOJUxT5L/RxgV0=}
 
+deal:
+  service:
+    url: ${DEAL_SERVICE_URL:http://localhost:8085}
+    mock:
+      has-active-deal: ${DEAL_SERVICE_MOCK_HAS_ACTIVE_DEAL:false}
+
+app:
+  storage:
+    root: ${STORAGE_ROOT:./uploads}
+
 spring:
   application:
     name: rally-catalog
+
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
 
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:catalog_db}

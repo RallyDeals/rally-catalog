@@ -5,6 +5,7 @@ import com.rally.catalog.dto.ProductLookupItem;
 import com.rally.catalog.dto.ProductLookupResponse;
 import com.rally.catalog.dto.ProductRequest;
 import com.rally.catalog.dto.ProductResponse;
+import com.rally.catalog.client.DealServiceClient;
 import com.rally.catalog.dto.ProductUpdateRequest;
 import com.rally.catalog.entity.Category;
 import com.rally.catalog.entity.Product;
@@ -12,6 +13,7 @@ import com.rally.catalog.entity.ProductStatus;
 import com.rally.catalog.entity.Role;
 import com.rally.catalog.exception.GoneException;
 import com.rally.catalog.mapper.CatalogMapper;
+import com.rally.common.exceptions.shared.ConflictException;
 import com.rally.common.exceptions.domain.catalog.ProductNotFoundException;
 import com.rally.common.exceptions.domain.catalog.ProductNotOwnedException;
 import com.rally.common.exceptions.shared.BadRequestException;
@@ -45,12 +47,14 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final CatalogMapper catalogMapper;
+    private final DealServiceClient dealServiceClient;
 
     public ProductService(ProductRepository productRepository, CategoryRepository categoryRepository,
-                          CatalogMapper catalogMapper) {
+                          CatalogMapper catalogMapper, DealServiceClient dealServiceClient) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.catalogMapper = catalogMapper;
+        this.dealServiceClient = dealServiceClient;
     }
 
     public ProductResponse createProduct(UUID sellerId, ProductRequest request) {
@@ -63,6 +67,9 @@ public class ProductService {
                 request.getBasePrice(),
                 request.getImageUrl()
         );
+        if (request.getImages() != null) {
+            product.setImages(request.getImages());
+        }
         return catalogMapper.toProductResponse(productRepository.save(product));
     }
 
@@ -120,9 +127,12 @@ public class ProductService {
         if (product.isDeleted()) {
             throw new GoneException("Product already deleted");
         }
-        // TODO(deal): return 409 when the product is tied to an active deal. Requires a
-        //  Deal Service contract (sync: GET /internal/deals?productId={id}&active=true, or
-        //  deal lifecycle events). See rally-docs/services docs/catalog-service.md §10.1.
+        // Contract: Deal Service GET /internal/deals?productId={id}&active=true (§10.1 of
+        // catalog-service.md). Mocked by DealServiceFakeClientImpl outside the prod profile
+        // (deal.service.mock.has-active-deal); real client under prod (deal.service.url).
+        if (dealServiceClient.hasActiveDeal(product.getId())) {
+            throw new ConflictException("Product is tied to an active deal and cannot be deleted");
+        }
         product.setDeletedAt(LocalDateTime.now());
         productRepository.save(product);
     }

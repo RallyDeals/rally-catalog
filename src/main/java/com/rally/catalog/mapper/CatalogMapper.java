@@ -25,7 +25,21 @@ public interface CatalogMapper {
 
     List<CategoryResponse> toCategoryResponses(List<Category> categories);
 
-    ProductLookupItem toProductLookupItem(Product product);
+    default ProductLookupItem toProductLookupItem(Product product) {
+        ProductLookupItem item = new ProductLookupItem();
+        item.setId(product.getId());
+        item.setName(product.getName());
+        item.setBasePrice(product.getBasePrice());
+        item.setImageUrl(firstImage(product));
+        return item;
+    }
+
+    default String firstImage(Product product) {
+        if (product.getImages() != null && !product.getImages().isEmpty()) {
+            return product.getImages().get(0);
+        }
+        return product.getImageUrl();
+    }
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "category", ignore = true)

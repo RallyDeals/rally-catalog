@@ -1,5 +1,6 @@
 package com.rally.catalog.service;
 
+import com.rally.catalog.client.DealServiceClient;
 import com.rally.catalog.dto.PageResponse;
 import com.rally.catalog.dto.ProductLookupResponse;
 import com.rally.catalog.dto.ProductRequest;
@@ -15,6 +16,7 @@ import com.rally.catalog.repository.CategoryRepository;
 import com.rally.catalog.repository.ProductRepository;
 import com.rally.common.exceptions.domain.catalog.ProductNotOwnedException;
 import com.rally.common.exceptions.shared.BadRequestException;
+import com.rally.common.exceptions.shared.ConflictException;
 import com.rally.common.exceptions.shared.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +39,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -53,6 +56,9 @@ class ProductServiceTest {
     @Mock
     private CategoryRepository categoryRepository;
 
+    @Mock
+    private DealServiceClient dealServiceClient;
+
     private ProductService productService;
 
     private static final UUID SELLER = UUID.fromString("11111111-1111-4111-8111-111111111111");
@@ -62,7 +68,8 @@ class ProductServiceTest {
 
     @BeforeEach
     void setUp() {
-        productService = new ProductService(productRepository, categoryRepository, new CatalogMapperImpl());
+        productService = new ProductService(
+                productRepository, categoryRepository, new CatalogMapperImpl(), dealServiceClient);
     }
 
     private Category category() {
@@ -230,11 +237,24 @@ class ProductServiceTest {
         Product approved = product(ProductStatus.APPROVED);
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
         when(productRepository.save(any(Product.class))).thenReturn(approved);
+        when(dealServiceClient.hasActiveDeal("prod-1")).thenReturn(false);
 
         productService.deleteProduct("prod-1", SELLER);
 
         assertNotNull(approved.getDeletedAt());
         verify(productRepository).save(approved);
+    }
+
+    @Test
+    void deleteProduct_shouldRejectWhenTiedToActiveDeal() {
+        Product approved = product(ProductStatus.APPROVED);
+        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(dealServiceClient.hasActiveDeal("prod-1")).thenReturn(true);
+
+        assertThrows(ConflictException.class, () -> productService.deleteProduct("prod-1", SELLER));
+
+        assertNull(approved.getDeletedAt());
+        verify(productRepository, never()).save(any(Product.class));
     }
 
     @Test
@@ -362,6 +382,27 @@ class ProductServiceTest {
         assertTrue(response.getFound().containsKey("prod-1"));
         assertEquals("prod-1", response.getFound().get("prod-1").getId());
         assertEquals(List.of("prod-2"), response.getNotFound());
+    }
+
+    @Test
+    void lookupProducts_shouldReturnFirstGalleryImageAsCover() {
+        Product approved = product(ProductStatus.APPROVED);
+        approved.setImages(List.of("https://cdn.example.com/one.jpg", "https://cdn.example.com/two.jpg"));
+        when(productRepository.findAll(any(Specification.class))).thenReturn(List.of(approved));
+
+        ProductLookupResponse response = productService.lookupProducts(List.of("prod-1"));
+
+        assertEquals("https://cdn.example.com/one.jpg", response.getFound().get("prod-1").getImageUrl());
+    }
+
+    @Test
+    void lookupProducts_shouldFallBackToImageUrlColumnWhenGalleryEmpty() {
+        Product approved = product(ProductStatus.APPROVED);
+        when(productRepository.findAll(any(Specification.class))).thenReturn(List.of(approved));
+
+        ProductLookupResponse response = productService.lookupProducts(List.of("prod-1"));
+
+        assertEquals("https://cdn.example.com/img.jpg", response.getFound().get("prod-1").getImageUrl());
     }
 
     @Test

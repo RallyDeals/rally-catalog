@@ -1,6 +1,7 @@
 package com.rally.catalog.controller;
 
 import com.rally.catalog.dto.PageResponse;
+import com.rally.catalog.dto.ImageUploadResponse;
 import com.rally.catalog.dto.ProductLookupRequest;
 import com.rally.catalog.dto.ProductLookupResponse;
 import com.rally.catalog.dto.ProductRequest;
@@ -9,7 +10,9 @@ import com.rally.catalog.dto.ProductUpdateRequest;
 import com.rally.catalog.dto.RejectRequest;
 import com.rally.catalog.entity.ProductStatus;
 import com.rally.catalog.entity.Role;
+import com.rally.catalog.service.ImageStorageService;
 import com.rally.catalog.service.ProductService;
+import com.rally.common.exceptions.shared.UnauthorizedException;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -32,9 +36,11 @@ import java.util.UUID;
 public class ProductController {
 
     private final ProductService productService;
+    private final ImageStorageService imageStorageService;
 
-    public ProductController(ProductService productService) {
+    public ProductController(ProductService productService, ImageStorageService imageStorageService) {
         this.productService = productService;
+        this.imageStorageService = imageStorageService;
     }
 
     @PostMapping
@@ -43,6 +49,19 @@ public class ProductController {
             @Valid @RequestBody ProductRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(productService.createProduct(sellerId, request));
+    }
+
+    @PostMapping("/images")
+    public ResponseEntity<ImageUploadResponse> uploadImage(
+            @RequestHeader("X-User-Id") UUID sellerId,
+            @RequestHeader("X-User-Role") String role,
+            @RequestParam("file") MultipartFile file) {
+        Role callerRole = Role.fromValue(role);
+        if (callerRole != Role.SELLER && callerRole != Role.ADMIN) {
+            throw new UnauthorizedException("Only sellers and admins can upload product images");
+        }
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new ImageUploadResponse(imageStorageService.store(file)));
     }
 
     @GetMapping
