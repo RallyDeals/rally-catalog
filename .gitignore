@@ -36,6 +36,10 @@ SESSION-LOG.md
 
 ### Runtime logs (never commit) ###
 *.log
+*.log.*
+
+### Uploaded product media (never commit) ###
+uploads/
 
 ### Secrets (never commit) ###
 .env
