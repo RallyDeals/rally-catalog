@@ -67,6 +67,7 @@ public class ProductController {
     @GetMapping
     public ResponseEntity<PageResponse<ProductResponse>> browseOrSearch(
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) String tag,
             @RequestParam(required = false) String categoryId,
             @RequestParam(required = false) UUID sellerId,
             @RequestParam(required = false) BigDecimal minPrice,
@@ -75,7 +76,7 @@ public class ProductController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit) {
         return ResponseEntity.ok(productService.searchProducts(
-                q, categoryId, sellerId, minPrice, maxPrice, sort, page, limit));
+                q, tag, categoryId, sellerId, minPrice, maxPrice, sort, page, limit));
     }
 
     @GetMapping("/{id}")

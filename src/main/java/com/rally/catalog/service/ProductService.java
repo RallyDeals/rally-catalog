@@ -84,13 +84,14 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> searchProducts(
-            String q, String categoryId, UUID sellerId,
+            String q, String tag, String categoryId, UUID sellerId,
             BigDecimal minPrice, BigDecimal maxPrice,
             String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
         Specification<Product> spec = Specification.where(ProductSpecifications.approvedAndNotDeleted())
                 .and(ProductSpecifications.visible(true))
                 .and(ProductSpecifications.keyword(q))
+                .and(ProductSpecifications.tagIs(tag))
                 .and(ProductSpecifications.categoryIs(categoryId))
                 .and(ProductSpecifications.sellerIs(sellerId == null ? null : sellerId.toString()))
                 .and(ProductSpecifications.priceBetween(minPrice, maxPrice));

@@ -445,7 +445,7 @@ class ProductServiceTest {
         Page<Product> page = new PageImpl<>(List.of(product(ProductStatus.APPROVED)), PageRequest.of(0, 20), 1);
         when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
 
-        PageResponse<ProductResponse> response = productService.searchProducts(null, null, null, null, null, null, 1, 20);
+        PageResponse<ProductResponse> response = productService.searchProducts(null, null, null, null, null, null, null, 1, 20);
 
         verify(productRepository).findAll(any(Specification.class), any(Pageable.class));
         assertEquals(1, response.getItems().size());
@@ -457,7 +457,18 @@ class ProductServiceTest {
         Page<Product> page = new PageImpl<>(List.of(product(ProductStatus.APPROVED)), PageRequest.of(0, 20), 1);
         when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
 
-        PageResponse<ProductResponse> response = productService.searchProducts("headphones", null, null, null, null, null, 1, 20);
+        PageResponse<ProductResponse> response = productService.searchProducts("headphones", null, null, null, null, null, null, 1, 20);
+
+        verify(productRepository).findAll(any(Specification.class), any(Pageable.class));
+        assertEquals(1, response.getItems().size());
+    }
+
+    @Test
+    void searchProducts_shouldApplyTagFilterToCriteriaQuery() {
+        Page<Product> page = new PageImpl<>(List.of(product(ProductStatus.APPROVED)), PageRequest.of(0, 20), 1);
+        when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+
+        PageResponse<ProductResponse> response = productService.searchProducts(null, "wireless", null, null, null, null, null, 1, 20);
 
         verify(productRepository).findAll(any(Specification.class), any(Pageable.class));
         assertEquals(1, response.getItems().size());
@@ -466,15 +477,15 @@ class ProductServiceTest {
     @Test
     void searchProducts_shouldRejectInvalidSortField() {
         assertThrows(BadRequestException.class,
-                () -> productService.searchProducts(null, null, null, null, null, "price", 1, 20));
+                () -> productService.searchProducts(null, null, null, null, null, null, "price", 1, 20));
     }
 
     @Test
     void searchProducts_shouldRejectOutOfRangePagination() {
         assertThrows(BadRequestException.class,
-                () -> productService.searchProducts(null, null, null, null, null, null, 0, 20));
+                () -> productService.searchProducts(null, null, null, null, null, null, null, 0, 20));
         assertThrows(BadRequestException.class,
-                () -> productService.searchProducts(null, null, null, null, null, null, 1, 101));
+                () -> productService.searchProducts(null, null, null, null, null, null, null, 1, 101));
     }
 
     @Test

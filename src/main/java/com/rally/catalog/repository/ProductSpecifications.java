@@ -56,6 +56,12 @@ public final class ProductSpecifications {
                 : cb.equal(root.get("category").get("id"), categoryId);
     }
 
+    public static Specification<Product> tagIs(String tag) {
+        return (root, query, cb) -> tag == null || tag.isBlank()
+                ? null
+                : cb.isMember(tag.trim(), root.get("tags"));
+    }
+
     public static Specification<Product> sellerIs(String sellerId) {
         return (root, query, cb) -> sellerId == null
                 ? null
