@@ -153,6 +153,8 @@ public class ProductService {
             throw new ConflictException("Product is not deleted");
         }
         product.setDeletedAt(null);
+        product.setStatus(ProductStatus.PENDING_APPROVAL);
+        product.setRejectionReason(null);
         return catalogMapper.toProductResponse(productRepository.save(product));
     }
 

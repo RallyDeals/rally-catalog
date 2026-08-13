@@ -368,15 +368,18 @@ class ProductServiceTest {
     }
 
     @Test
-    void restoreProduct_shouldClearDeletedAt() {
+    void restoreProduct_shouldClearDeletedAtAndResubmitForApproval() {
         Product approved = product(ProductStatus.APPROVED);
         approved.setDeletedAt(LocalDateTime.now());
+        approved.setRejectionReason("removed by seller");
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
         when(productRepository.save(any(Product.class))).thenReturn(approved);
 
         productService.restoreProduct("prod-1", SELLER);
 
         assertNull(approved.getDeletedAt());
+        assertEquals(ProductStatus.PENDING_APPROVAL, approved.getStatus());
+        assertNull(approved.getRejectionReason());
         verify(productRepository).save(approved);
     }
 
