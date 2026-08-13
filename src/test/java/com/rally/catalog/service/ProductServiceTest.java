@@ -368,6 +368,37 @@ class ProductServiceTest {
     }
 
     @Test
+    void restoreProduct_shouldClearDeletedAt() {
+        Product approved = product(ProductStatus.APPROVED);
+        approved.setDeletedAt(LocalDateTime.now());
+        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.save(any(Product.class))).thenReturn(approved);
+
+        productService.restoreProduct("prod-1", SELLER);
+
+        assertNull(approved.getDeletedAt());
+        verify(productRepository).save(approved);
+    }
+
+    @Test
+    void restoreProduct_shouldRejectWhenNotDeleted() {
+        Product approved = product(ProductStatus.APPROVED);
+        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+
+        assertThrows(ConflictException.class, () -> productService.restoreProduct("prod-1", SELLER));
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
+    @Test
+    void restoreProduct_shouldRejectNonOwner() {
+        Product approved = product(ProductStatus.APPROVED);
+        approved.setDeletedAt(LocalDateTime.now());
+        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+
+        assertThrows(ProductNotOwnedException.class, () -> productService.restoreProduct("prod-1", OTHER));
+    }
+
+    @Test
     void approveProduct_shouldApprovePendingProduct() {
         Product pending = product(ProductStatus.PENDING_APPROVAL);
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(pending));
@@ -448,7 +479,7 @@ class ProductServiceTest {
         Page<Product> page = new PageImpl<>(List.of(product(ProductStatus.APPROVED)));
         when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
 
-        PageResponse<ProductResponse> response = productService.listSellerProducts(SELLER, null, false, null, 1, 20);
+        PageResponse<ProductResponse> response = productService.listSellerProducts(SELLER, null, false, false, null, 1, 20);
 
         assertEquals(1, response.getItems().size());
     }

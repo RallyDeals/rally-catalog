@@ -102,6 +102,13 @@ public class ProductController {
         return ResponseEntity.noContent().build();
     }
 
+    @PatchMapping("/{id}/restore")
+    public ResponseEntity<ProductResponse> restoreProduct(
+            @PathVariable String id,
+            @RequestHeader("X-User-Id") UUID sellerId) {
+        return ResponseEntity.ok(productService.restoreProduct(id, sellerId));
+    }
+
     @PostMapping("/lookup")
     public ResponseEntity<ProductLookupResponse> lookupProducts(
             @Valid @RequestBody ProductLookupRequest request) {
@@ -112,12 +119,13 @@ public class ProductController {
     public ResponseEntity<PageResponse<ProductResponse>> getSellerProducts(
             @PathVariable UUID sellerId,
             @RequestParam(required = false) ProductStatus status,
+            @RequestParam(defaultValue = "false") boolean deleted,
             @RequestParam(defaultValue = "true") boolean includeDeleted,
             @RequestParam(required = false) String sort,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit) {
         return ResponseEntity.ok(productService.listSellerProducts(
-                sellerId, status, includeDeleted, sort, page, limit));
+                sellerId, status, includeDeleted, deleted, sort, page, limit));
     }
 
     @GetMapping("/admin")

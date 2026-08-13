@@ -147,6 +147,15 @@ public class ProductService {
         productRepository.save(product);
     }
 
+    public ProductResponse restoreProduct(String id, UUID sellerId) {
+        Product product = findOwned(id, sellerId.toString());
+        if (!product.isDeleted()) {
+            throw new ConflictException("Product is not deleted");
+        }
+        product.setDeletedAt(null);
+        return catalogMapper.toProductResponse(productRepository.save(product));
+    }
+
     public ProductResponse approveProduct(String id) {
         Product product = findById(id);
         if (product.getStatus() != ProductStatus.PENDING_APPROVAL) {
@@ -169,12 +178,17 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> listSellerProducts(
-            UUID sellerId, ProductStatus status, boolean includeDeleted,
+            UUID sellerId, ProductStatus status, boolean includeDeleted, boolean deletedOnly,
             String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
-        Specification<Product> spec = Specification.where(ProductSpecifications.sellerIs(sellerId.toString()))
-                .and(ProductSpecifications.statusIs(status))
-                .and(ProductSpecifications.notDeleted(includeDeleted));
+        Specification<Product> spec = Specification.where(ProductSpecifications.sellerIs(sellerId.toString()));
+        if (deletedOnly) {
+            spec = spec.and(ProductSpecifications.deletedOnly());
+        } else {
+            spec = spec
+                    .and(ProductSpecifications.statusIs(status))
+                    .and(ProductSpecifications.notDeleted(includeDeleted));
+        }
         return toPageResponse(productRepository.findAll(spec, pageable));
     }
 

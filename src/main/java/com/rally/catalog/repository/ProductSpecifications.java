@@ -87,6 +87,10 @@ public final class ProductSpecifications {
                 : cb.isNull(root.get("deletedAt"));
     }
 
+    public static Specification<Product> deletedOnly() {
+        return (root, query, cb) -> cb.isNotNull(root.get("deletedAt"));
+    }
+
     public static Specification<Product> idIn(Collection<String> ids) {
         return (root, query, cb) -> root.get("id").in(ids);
     }
