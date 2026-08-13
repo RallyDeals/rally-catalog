@@ -110,6 +110,78 @@ class ProductServiceTest {
     }
 
     @Test
+    void createProduct_shouldPersistSkuVisibilityAndTags() {
+        when(categoryRepository.findById("cat-1")).thenReturn(Optional.of(category()));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> {
+            Product p = invocation.getArgument(0);
+            p.setId("prod-1");
+            return p;
+        });
+
+        ProductRequest request = new ProductRequest();
+        request.setName("Headphones");
+        request.setCategoryId("cat-1");
+        request.setBasePrice(new BigDecimal("79.99"));
+        request.setSku("HP-100-X");
+        request.setVisible(false);
+        request.setTags(List.of("audio", "wireless"));
+
+        ProductResponse response = productService.createProduct(SELLER, request);
+
+        assertEquals("HP-100-X", response.getSku());
+        assertFalse(response.isVisible());
+        assertEquals(List.of("audio", "wireless"), response.getTags());
+    }
+
+    @Test
+    void createProduct_shouldDefaultToVisible() {
+        when(categoryRepository.findById("cat-1")).thenReturn(Optional.of(category()));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ProductRequest request = new ProductRequest();
+        request.setName("Headphones");
+        request.setCategoryId("cat-1");
+        request.setBasePrice(new BigDecimal("79.99"));
+
+        ProductResponse response = productService.createProduct(SELLER, request);
+
+        assertTrue(response.isVisible());
+    }
+
+    @Test
+    void updateProduct_shouldApplySkuVisibilityAndTags() {
+        Product approved = product(ProductStatus.APPROVED);
+        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.save(any(Product.class))).thenReturn(approved);
+
+        ProductUpdateRequest request = new ProductUpdateRequest();
+        request.setSku("HP-PRO-X");
+        request.setVisible(false);
+        request.setTags(List.of("premium", "noise-cancelling"));
+
+        ProductResponse response = productService.updateProduct("prod-1", SELLER, request);
+
+        assertEquals("HP-PRO-X", response.getSku());
+        assertFalse(response.isVisible());
+        assertEquals(List.of("premium", "noise-cancelling"), response.getTags());
+    }
+
+    @Test
+    void updateProduct_shouldNotOverwriteVisibilityWhenNull() {
+        Product approved = product(ProductStatus.APPROVED);
+        approved.setVisible(false);
+        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.save(any(Product.class))).thenReturn(approved);
+
+        ProductUpdateRequest request = new ProductUpdateRequest();
+        request.setName("Headphones Pro");
+
+        ProductResponse response = productService.updateProduct("prod-1", SELLER, request);
+
+        assertFalse(response.isVisible());
+    }
+
+    @Test
     void createProduct_shouldThrowWhenCategoryMissing() {
         when(categoryRepository.findById("missing")).thenReturn(Optional.empty());
 
@@ -135,6 +207,26 @@ class ProductServiceTest {
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
 
         ProductResponse response = productService.getProduct("prod-1", Role.BUYER, BUYER);
+
+        assertEquals("prod-1", response.getId());
+    }
+
+    @Test
+    void getProduct_shouldHideHiddenApprovedProductFromBuyer() {
+        Product approved = product(ProductStatus.APPROVED);
+        approved.setVisible(false);
+        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+
+        assertThrows(NotFoundException.class, () -> productService.getProduct("prod-1", Role.BUYER, BUYER));
+    }
+
+    @Test
+    void getProduct_shouldExposeHiddenProductToOwnerSeller() {
+        Product approved = product(ProductStatus.APPROVED);
+        approved.setVisible(false);
+        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+
+        ProductResponse response = productService.getProduct("prod-1", Role.SELLER, SELLER);
 
         assertEquals("prod-1", response.getId());
     }
