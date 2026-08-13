@@ -26,6 +26,14 @@ public class ProductRequest {
     @DecimalMin(value = "0.01", message = "Base price must be positive")
     private BigDecimal basePrice;
 
+    @Size(max = 64, message = "SKU must be at most 64 characters")
+    private String sku;
+
+    private Boolean visible;
+
+    @Size(max = 50, message = "A product can have at most 50 tags")
+    private List<String> tags;
+
     private String imageUrl;
 
     @Size(max = 10, message = "A product can have at most 10 images")

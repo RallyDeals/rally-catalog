@@ -18,6 +18,9 @@ public class ProductResponse {
     private String description;
     private CategoryResponse category;
     private BigDecimal basePrice;
+    private String sku;
+    private boolean visible;
+    private List<String> tags;
     private String imageUrl;
     private List<String> images;
     private ProductStatus status;

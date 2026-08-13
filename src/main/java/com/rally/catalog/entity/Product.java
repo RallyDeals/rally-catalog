@@ -53,6 +53,18 @@ public class Product {
     @Column(name = "base_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal basePrice;
 
+    @Column(length = 64)
+    private String sku;
+
+    @Column(nullable = false)
+    private boolean visible = true;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "product_tags", joinColumns = @JoinColumn(name = "product_id"))
+    @OrderColumn(name = "tags_order")
+    @Column(name = "tag", length = 50)
+    private List<String> tags = new ArrayList<>();
+
     @Column(name = "image_url", length = 500)
     private String imageUrl;
 
