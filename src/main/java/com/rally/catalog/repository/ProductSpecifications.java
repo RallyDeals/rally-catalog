@@ -2,7 +2,10 @@ package com.rally.catalog.repository;
 
 import com.rally.catalog.entity.Product;
 import com.rally.catalog.entity.ProductStatus;
+import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
@@ -33,8 +36,18 @@ public final class ProductSpecifications {
         return (root, query, cb) -> {
             Predicate nameMatch = cb.like(cb.lower(root.<String>get("name")), pattern);
             Predicate descriptionMatch = cb.like(cb.lower(root.<String>get("description")), pattern);
-            return cb.or(nameMatch, descriptionMatch);
+            Subquery<Product> tagSubquery = query.subquery(Product.class);
+            Root<Product> tagRoot = tagSubquery.from(Product.class);
+            tagSubquery.select(tagRoot).distinct(true);
+            tagSubquery.where(cb.and(
+                    cb.equal(tagRoot.get("id"), root.get("id")),
+                    cb.like(cb.lower(tagRoot.join("tags")), pattern)));
+            return cb.or(nameMatch, descriptionMatch, cb.exists(tagSubquery));
         };
+    }
+
+    public static Specification<Product> visible(boolean visible) {
+        return (root, query, cb) -> cb.equal(root.get("visible"), visible);
     }
 
     public static Specification<Product> categoryIs(String categoryId) {

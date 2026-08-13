@@ -70,6 +70,15 @@ public class ProductService {
         if (request.getImages() != null) {
             product.setImages(request.getImages());
         }
+        if (request.getSku() != null) {
+            product.setSku(request.getSku());
+        }
+        if (request.getVisible() != null) {
+            product.setVisible(request.getVisible());
+        }
+        if (request.getTags() != null) {
+            product.setTags(request.getTags());
+        }
         return catalogMapper.toProductResponse(productRepository.save(product));
     }
 
@@ -80,6 +89,7 @@ public class ProductService {
             String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
         Specification<Product> spec = Specification.where(ProductSpecifications.approvedAndNotDeleted())
+                .and(ProductSpecifications.visible(true))
                 .and(ProductSpecifications.keyword(q))
                 .and(ProductSpecifications.categoryIs(categoryId))
                 .and(ProductSpecifications.sellerIs(sellerId == null ? null : sellerId.toString()))
@@ -97,7 +107,7 @@ public class ProductService {
                 && product.getSellerId().equals(viewerId.toString())) {
             return catalogMapper.toProductResponse(product);
         }
-        if (product.getStatus() == ProductStatus.APPROVED && !product.isDeleted()) {
+        if (product.getStatus() == ProductStatus.APPROVED && !product.isDeleted() && product.isVisible()) {
             return catalogMapper.toProductResponse(product);
         }
         throw new ProductNotFoundException(id);
