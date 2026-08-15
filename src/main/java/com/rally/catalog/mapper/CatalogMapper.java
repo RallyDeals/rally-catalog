@@ -31,6 +31,7 @@ public interface CatalogMapper {
         item.setName(product.getName());
         item.setBasePrice(product.getBasePrice());
         item.setImageUrl(firstImage(product));
+        item.setSellerId(product.getSellerId());
         return item;
     }
 

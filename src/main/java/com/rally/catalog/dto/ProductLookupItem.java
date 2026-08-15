@@ -17,4 +17,5 @@ public class ProductLookupItem {
     private String name;
     private BigDecimal basePrice;
     private String imageUrl;
+    private String sellerId;
 }
