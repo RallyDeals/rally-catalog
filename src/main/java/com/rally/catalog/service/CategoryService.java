@@ -34,7 +34,7 @@ public class CategoryService {
         if (categoryRepository.existsByNameIgnoreCase(request.getName())) {
             throw new BadRequestException("Category already exists: " + request.getName());
         }
-        Category category = new Category(request.getName(), request.getDescription());
+        Category category = new Category(request.getName(), request.getDescription(), request.getIcon());
         return catalogMapper.toCategoryResponse(categoryRepository.save(category));
     }
 
@@ -59,6 +59,7 @@ public class CategoryService {
         Category category = findCategory(id);
         category.setName(request.getName());
         category.setDescription(request.getDescription());
+        category.setIcon(request.getIcon());
         return catalogMapper.toCategoryResponse(categoryRepository.save(category));
     }
 
