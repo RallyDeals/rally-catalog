@@ -40,6 +40,9 @@ public class Product {
     @Column(name = "seller_id", nullable = false, length = 36)
     private String sellerId;
 
+    @Column(name = "seller_name", length = 255)
+    private String sellerName;
+
     @Column(nullable = false)
     private String name;
 
@@ -90,9 +93,10 @@ public class Product {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    public Product(String sellerId, String name, String description, Category category,
+    public Product(String sellerId, String sellerName, String name, String description, Category category,
                    BigDecimal basePrice, String imageUrl) {
         this.sellerId = sellerId;
+        this.sellerName = sellerName;
         this.name = name;
         this.description = description;
         this.category = category;

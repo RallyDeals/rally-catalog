@@ -80,7 +80,7 @@ class ProductServiceTest {
 
     private Product product(ProductStatus status) {
         Product product = new Product(
-                SELLER.toString(), "Headphones", "Noise cancelling", category(),
+                SELLER.toString(), "Jane Seller", "Headphones", "Noise cancelling", category(),
                 new BigDecimal("79.99"), "https://cdn.example.com/img.jpg");
         product.setId("prod-1");
         product.setStatus(status);
@@ -102,10 +102,11 @@ class ProductServiceTest {
         request.setCategoryId("cat-1");
         request.setBasePrice(new BigDecimal("79.99"));
 
-        ProductResponse response = productService.createProduct(SELLER, request);
+        ProductResponse response = productService.createProduct(SELLER, "Jane Seller", request);
 
         assertEquals(ProductStatus.PENDING_APPROVAL, response.getStatus());
         assertEquals("11111111-1111-4111-8111-111111111111", response.getSellerId());
+        assertEquals("Jane Seller", response.getSellerName());
         assertEquals("Electronics", response.getCategory().getName());
     }
 
@@ -126,7 +127,7 @@ class ProductServiceTest {
         request.setVisible(false);
         request.setTags(List.of("audio", "wireless"));
 
-        ProductResponse response = productService.createProduct(SELLER, request);
+        ProductResponse response = productService.createProduct(SELLER, "Jane Seller", request);
 
         assertEquals("HP-100-X", response.getSku());
         assertFalse(response.isVisible());
@@ -143,7 +144,7 @@ class ProductServiceTest {
         request.setCategoryId("cat-1");
         request.setBasePrice(new BigDecimal("79.99"));
 
-        ProductResponse response = productService.createProduct(SELLER, request);
+        ProductResponse response = productService.createProduct(SELLER, "Jane Seller", request);
 
         assertTrue(response.isVisible());
     }
@@ -190,7 +191,7 @@ class ProductServiceTest {
         request.setCategoryId("missing");
         request.setBasePrice(new BigDecimal("79.99"));
 
-        assertThrows(NotFoundException.class, () -> productService.createProduct(SELLER, request));
+        assertThrows(NotFoundException.class, () -> productService.createProduct(SELLER, "Jane Seller", request));
     }
 
     @Test
