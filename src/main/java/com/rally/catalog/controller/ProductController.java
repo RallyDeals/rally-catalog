@@ -46,9 +46,10 @@ public class ProductController {
     @PostMapping
     public ResponseEntity<ProductResponse> createProduct(
             @RequestHeader("X-User-Id") UUID sellerId,
+            @RequestHeader("X-User-Name") String sellerName,
             @Valid @RequestBody ProductRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(productService.createProduct(sellerId, request));
+                .body(productService.createProduct(sellerId, sellerName, request));
     }
 
     @PostMapping("/images")

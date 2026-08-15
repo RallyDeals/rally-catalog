@@ -57,10 +57,11 @@ public class ProductService {
         this.dealServiceClient = dealServiceClient;
     }
 
-    public ProductResponse createProduct(UUID sellerId, ProductRequest request) {
+    public ProductResponse createProduct(UUID sellerId, String sellerName, ProductRequest request) {
         Category category = findCategory(request.getCategoryId());
         Product product = new Product(
                 sellerId.toString(),
+                sellerName,
                 request.getName(),
                 request.getDescription(),
                 category,
