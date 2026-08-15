@@ -31,12 +31,21 @@ public class Category {
     @Column
     private String description;
 
+    @Column(length = 50)
+    private String icon;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     public Category(String name, String description) {
         this.name = name;
         this.description = description;
+    }
+
+    public Category(String name, String description, String icon) {
+        this.name = name;
+        this.description = description;
+        this.icon = icon;
     }
 
     @PrePersist
