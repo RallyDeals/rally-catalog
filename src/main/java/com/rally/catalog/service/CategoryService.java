@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -37,8 +39,15 @@ public class CategoryService {
     }
 
     @Transactional(readOnly = true)
-    public List<CategoryResponse> listCategories() {
-        return catalogMapper.toCategoryResponses(categoryRepository.findAll());
+    public List<CategoryResponse> listCategories(boolean includeProductsCount) {
+        List<CategoryResponse> categories = catalogMapper.toCategoryResponses(categoryRepository.findAll());
+        if (includeProductsCount) {
+            Map<String, Long> counts = productRepository.countProductsGroupedByCategory().stream()
+                    .collect(Collectors.toMap(row -> (String) row[0], row -> (Long) row[1]));
+            categories.forEach(category ->
+                    category.setProductsCount(counts.getOrDefault(category.getId(), 0L).intValue()));
+        }
+        return categories;
     }
 
     @Transactional(readOnly = true)

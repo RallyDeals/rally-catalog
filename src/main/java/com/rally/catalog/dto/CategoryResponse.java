@@ -12,5 +12,6 @@ public class CategoryResponse {
     private String id;
     private String name;
     private String description;
+    private int productsCount;
     private LocalDateTime createdAt;
 }

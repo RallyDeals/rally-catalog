@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -75,10 +76,32 @@ class CategoryServiceTest {
         electronics.setId("cat-1");
         when(categoryRepository.findAll()).thenReturn(List.of(electronics));
 
-        List<CategoryResponse> result = categoryService.listCategories();
+        List<CategoryResponse> result = categoryService.listCategories(false);
 
         assertEquals(1, result.size());
         assertEquals("Electronics", result.get(0).getName());
+        assertEquals(0, result.get(0).getProductsCount());
+    }
+
+    @Test
+    void listCategories_shouldIncludeProductsCountWhenRequested() {
+        Category electronics = new Category("Electronics", "Gadgets");
+        electronics.setId("cat-1");
+        Category watches = new Category("Watches", "Timepieces");
+        watches.setId("cat-2");
+        when(categoryRepository.findAll()).thenReturn(List.of(electronics, watches));
+        List<Object[]> counts = new ArrayList<>();
+        counts.add(new Object[] {"cat-1", 5L});
+        when(productRepository.countProductsGroupedByCategory()).thenReturn(counts);
+
+        List<CategoryResponse> result = categoryService.listCategories(true);
+
+        CategoryResponse electronicsResponse = result.stream()
+                .filter(c -> c.getId().equals("cat-1")).findFirst().orElseThrow();
+        CategoryResponse watchesResponse = result.stream()
+                .filter(c -> c.getId().equals("cat-2")).findFirst().orElseThrow();
+        assertEquals(5, electronicsResponse.getProductsCount());
+        assertEquals(0, watchesResponse.getProductsCount());
     }
 
     @Test
