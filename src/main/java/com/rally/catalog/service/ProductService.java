@@ -89,13 +89,14 @@ public class ProductService {
             BigDecimal minPrice, BigDecimal maxPrice,
             String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
-        Specification<Product> spec = Specification.where(ProductSpecifications.approvedAndNotDeleted())
-                .and(ProductSpecifications.visible(true))
-                .and(ProductSpecifications.keyword(q))
-                .and(ProductSpecifications.tagIs(tag))
-                .and(ProductSpecifications.categoryIs(categoryId))
-                .and(ProductSpecifications.sellerIs(sellerId == null ? null : sellerId.toString()))
-                .and(ProductSpecifications.priceBetween(minPrice, maxPrice));
+        Specification<Product> spec = Specification.allOf(
+                ProductSpecifications.approvedAndNotDeleted(),
+                ProductSpecifications.visible(true),
+                ProductSpecifications.keyword(q),
+                ProductSpecifications.tagIs(tag),
+                ProductSpecifications.categoryIs(categoryId),
+                ProductSpecifications.sellerIs(sellerId == null ? null : sellerId.toString()),
+                ProductSpecifications.priceBetween(minPrice, maxPrice));
         return toPageResponse(productRepository.findAll(spec, pageable));
     }
 
@@ -185,7 +186,7 @@ public class ProductService {
             UUID sellerId, ProductStatus status, boolean includeDeleted, boolean deletedOnly,
             String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
-        Specification<Product> spec = Specification.where(ProductSpecifications.sellerIs(sellerId.toString()));
+        Specification<Product> spec = ProductSpecifications.sellerIs(sellerId.toString());
         if (deletedOnly) {
             spec = spec.and(ProductSpecifications.deletedOnly());
         } else {
@@ -198,10 +199,12 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> listAdminProducts(
-            ProductStatus status, boolean includeDeleted, String sort, int page, int limit) {
+            ProductStatus status, String sellerId, boolean includeDeleted, String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
-        Specification<Product> spec = Specification.where(ProductSpecifications.statusIs(status))
-                .and(ProductSpecifications.notDeleted(includeDeleted));
+        Specification<Product> spec = Specification.allOf(
+                ProductSpecifications.statusIs(status),
+                ProductSpecifications.sellerIs(sellerId),
+                ProductSpecifications.notDeleted(includeDeleted));
         return toPageResponse(productRepository.findAll(spec, pageable));
     }
 

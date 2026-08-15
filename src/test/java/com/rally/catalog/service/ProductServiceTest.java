@@ -504,9 +504,19 @@ class ProductServiceTest {
         Page<Product> page = new PageImpl<>(List.of(product(ProductStatus.PENDING_APPROVAL)));
         when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
 
-        PageResponse<ProductResponse> response = productService.listAdminProducts(ProductStatus.PENDING_APPROVAL, false, null, 1, 20);
+        PageResponse<ProductResponse> response = productService.listAdminProducts(ProductStatus.PENDING_APPROVAL, null, false, null, 1, 20);
 
         assertEquals(ProductStatus.PENDING_APPROVAL, response.getItems().get(0).getStatus());
+    }
+
+    @Test
+    void listAdminProducts_shouldFilterBySeller() {
+        Page<Product> page = new PageImpl<>(List.of(product(ProductStatus.PENDING_APPROVAL)));
+        when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+
+        PageResponse<ProductResponse> response = productService.listAdminProducts(null, SELLER.toString(), false, null, 1, 20);
+
+        assertEquals(1, response.getItems().size());
     }
 
     @Test
