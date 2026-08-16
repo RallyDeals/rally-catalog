@@ -11,6 +11,8 @@ import com.rally.catalog.entity.Category;
 import com.rally.catalog.entity.Product;
 import com.rally.catalog.entity.ProductStatus;
 import com.rally.catalog.entity.Role;
+import com.rally.catalog.event.ProductCreatedEvent;
+import com.rally.catalog.event.ProductDeletedEvent;
 import com.rally.catalog.exception.GoneException;
 import com.rally.catalog.mapper.CatalogMapper;
 import com.rally.common.exceptions.shared.ConflictException;
@@ -26,6 +28,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,17 +47,26 @@ public class ProductService {
 
     private static final Set<String> SORTABLE_FIELDS = Set.of("createdAt", "basePrice", "name");
 
+    private static final String PRODUCT_CREATED_TOPIC = "product-created";
+    private static final String PRODUCT_DELETED_TOPIC = "product-deleted";
+
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final CatalogMapper catalogMapper;
     private final DealServiceClient dealServiceClient;
+    private final KafkaTemplate<String, ProductCreatedEvent> productCreatedKafkaTemplate;
+    private final KafkaTemplate<String, ProductDeletedEvent> productDeletedKafkaTemplate;
 
     public ProductService(ProductRepository productRepository, CategoryRepository categoryRepository,
-                          CatalogMapper catalogMapper, DealServiceClient dealServiceClient) {
+                          CatalogMapper catalogMapper, DealServiceClient dealServiceClient,
+                          KafkaTemplate<String, ProductCreatedEvent> productCreatedKafkaTemplate,
+                          KafkaTemplate<String, ProductDeletedEvent> productDeletedKafkaTemplate) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.catalogMapper = catalogMapper;
         this.dealServiceClient = dealServiceClient;
+        this.productCreatedKafkaTemplate = productCreatedKafkaTemplate;
+        this.productDeletedKafkaTemplate = productDeletedKafkaTemplate;
     }
 
     public ProductResponse createProduct(UUID sellerId, String sellerName, ProductRequest request) {
@@ -80,7 +92,15 @@ public class ProductService {
         if (request.getTags() != null) {
             product.setTags(request.getTags());
         }
-        return catalogMapper.toProductResponse(productRepository.save(product));
+
+        Product saved = productRepository.save(product);
+
+        if (request.getInitialStock() != null && request.getInitialStock() > 0) {
+            productCreatedKafkaTemplate.send(PRODUCT_CREATED_TOPIC,
+                    new ProductCreatedEvent(saved.getId(), request.getInitialStock()));
+        }
+
+        return catalogMapper.toProductResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -147,6 +167,9 @@ public class ProductService {
         }
         product.setDeletedAt(LocalDateTime.now());
         productRepository.save(product);
+
+        productDeletedKafkaTemplate.send(PRODUCT_DELETED_TOPIC,
+                new ProductDeletedEvent(product.getId()));
     }
 
     public ProductResponse restoreProduct(String id, UUID sellerId) {
@@ -178,6 +201,10 @@ public class ProductService {
         product.setStatus(ProductStatus.REJECTED);
         product.setRejectionReason(reason);
         return catalogMapper.toProductResponse(productRepository.save(product));
+    }
+
+    public int setSellerProductsInvisible(UUID sellerId) {
+        return productRepository.setAllInvisibleBySellerId(sellerId.toString());
     }
 
     @Transactional(readOnly = true)
