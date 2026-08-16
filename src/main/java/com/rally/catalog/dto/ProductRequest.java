@@ -38,4 +38,6 @@ public class ProductRequest {
 
     @Size(max = 10, message = "A product can have at most 10 images")
     private List<String> images;
+
+    private Integer initialStock;
 }
