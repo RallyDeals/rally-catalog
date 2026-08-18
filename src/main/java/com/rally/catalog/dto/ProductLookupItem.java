@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -17,5 +18,5 @@ public class ProductLookupItem {
     private String name;
     private BigDecimal basePrice;
     private String imageUrl;
-    private String sellerId;
+    private UUID sellerId;
 }

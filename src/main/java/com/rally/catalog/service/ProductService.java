@@ -72,7 +72,7 @@ public class ProductService {
     public ProductResponse createProduct(UUID sellerId, String sellerName, ProductRequest request) {
         Category category = findCategory(request.getCategoryId());
         Product product = new Product(
-                sellerId.toString(),
+                sellerId,
                 sellerName,
                 request.getName(),
                 request.getDescription(),
@@ -114,7 +114,7 @@ public class ProductService {
                 .and(ProductSpecifications.keyword(q))
                 .and(ProductSpecifications.tagIs(tag))
                 .and(ProductSpecifications.categoryIs(categoryId))
-                .and(ProductSpecifications.sellerIs(sellerId == null ? null : sellerId.toString()))
+                .and(ProductSpecifications.sellerIs(sellerId))
                 .and(ProductSpecifications.priceBetween(minPrice, maxPrice));
         return toPageResponse(productRepository.findAll(spec, pageable));
     }
@@ -126,7 +126,7 @@ public class ProductService {
             return catalogMapper.toProductResponse(product);
         }
         if (viewerRole == Role.SELLER && viewerId != null
-                && product.getSellerId().equals(viewerId.toString())) {
+                && product.getSellerId().equals(viewerId)) {
             return catalogMapper.toProductResponse(product);
         }
         if (product.getStatus() == ProductStatus.APPROVED && !product.isDeleted() && product.isVisible()) {
@@ -136,7 +136,7 @@ public class ProductService {
     }
 
     public ProductResponse updateProduct(String id, UUID sellerId, ProductUpdateRequest request) {
-        Product product = findOwned(id, sellerId.toString());
+        Product product = findOwned(id, sellerId);
         if (product.isDeleted()) {
             throw new GoneException("Product already deleted");
         }
@@ -155,7 +155,7 @@ public class ProductService {
     }
 
     public void deleteProduct(String id, UUID sellerId) {
-        Product product = findOwned(id, sellerId.toString());
+        Product product = findOwned(id, sellerId);
         if (product.isDeleted()) {
             throw new GoneException("Product already deleted");
         }
@@ -173,7 +173,7 @@ public class ProductService {
     }
 
     public ProductResponse restoreProduct(String id, UUID sellerId) {
-        Product product = findOwned(id, sellerId.toString());
+        Product product = findOwned(id, sellerId);
         if (!product.isDeleted()) {
             throw new ConflictException("Product is not deleted");
         }
@@ -212,7 +212,7 @@ public class ProductService {
             UUID sellerId, ProductStatus status, boolean includeDeleted, boolean deletedOnly,
             String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
-        Specification<Product> spec = Specification.where(ProductSpecifications.sellerIs(sellerId.toString()));
+        Specification<Product> spec = Specification.where(ProductSpecifications.sellerIs(sellerId));
         if (deletedOnly) {
             spec = spec.and(ProductSpecifications.deletedOnly());
         } else {
@@ -258,7 +258,7 @@ public class ProductService {
         return response;
     }
 
-    private Product findOwned(String id, String sellerId) {
+    private Product findOwned(String id, UUID sellerId) {
         Product product = findById(id);
         if (!product.getSellerId().equals(sellerId)) {
             throw new ProductNotOwnedException(id);

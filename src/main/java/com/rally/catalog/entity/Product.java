@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Getter
@@ -37,8 +38,8 @@ public class Product {
     @Column(length = 36)
     private String id;
 
-    @Column(name = "seller_id", nullable = false, length = 36)
-    private String sellerId;
+    @Column(name = "seller_id", nullable = false)
+    private UUID sellerId;
 
     @Column(name = "seller_name", length = 255)
     private String sellerName;
@@ -93,7 +94,7 @@ public class Product {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    public Product(String sellerId, String sellerName, String name, String description, Category category,
+    public Product(UUID sellerId, String sellerName, String name, String description, Category category,
                    BigDecimal basePrice, String imageUrl) {
         this.sellerId = sellerId;
         this.sellerName = sellerName;

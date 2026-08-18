@@ -90,7 +90,7 @@ class ProductServiceTest {
 
     private Product product(ProductStatus status) {
         Product product = new Product(
-                SELLER.toString(), "Jane Seller", "Headphones", "Noise cancelling", category(),
+                SELLER, "Jane Seller", "Headphones", "Noise cancelling", category(),
                 new BigDecimal("79.99"), "https://cdn.example.com/img.jpg");
         product.setId("prod-1");
         product.setStatus(status);

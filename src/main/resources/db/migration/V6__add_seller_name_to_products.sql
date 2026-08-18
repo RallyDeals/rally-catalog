@@ -10,7 +10,7 @@
 
 ALTER TABLE products ADD COLUMN seller_name VARCHAR(255);
 
-UPDATE products SET seller_name = 'Northgate Co.' WHERE seller_id = 'user-seed-0001';
+UPDATE products SET seller_name = 'Northgate Co.' WHERE seller_id = '018f3a38-c398-7517-a9a7-961de3330001';
 UPDATE products SET seller_name = 'Wrenfield Co.'     WHERE seller_id = 'a1b2c3d4-1111-4a1b-8c2d-000000000001';
 UPDATE products SET seller_name = 'Coastal Co.'  WHERE seller_id = 'a1b2c3d4-2222-4a1b-8c2d-000000000002';
 UPDATE products SET seller_name = 'Lumen Co.'       WHERE seller_id = 'a1b2c3d4-3333-4a1b-8c2d-000000000003';

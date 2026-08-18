@@ -17,7 +17,7 @@ CREATE TABLE categories (
 
 CREATE TABLE products (
     id                VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
-    seller_id         VARCHAR(36) NOT NULL,
+    seller_id         UUID NOT NULL,
     name              VARCHAR(255) NOT NULL,
     description       TEXT NOT NULL DEFAULT '',
     category_id       VARCHAR(36) REFERENCES categories(id),
