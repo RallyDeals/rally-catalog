@@ -115,7 +115,7 @@ class ProductServiceTest {
         ProductResponse response = productService.createProduct(SELLER, "Jane Seller", request);
 
         assertEquals(ProductStatus.PENDING_APPROVAL, response.getStatus());
-        assertEquals("11111111-1111-4111-8111-111111111111", response.getSellerId());
+        assertEquals(SELLER, response.getSellerId());
         assertEquals("Jane Seller", response.getSellerName());
         assertEquals("Electronics", response.getCategory().getName());
     }
