@@ -207,7 +207,10 @@ public class ProductService {
     }
 
     public int setSellerProductsInvisible(UUID sellerId) {
-        return productRepository.setAllInvisibleBySellerId(sellerId.toString());
+        List<Product> products = productRepository.findAllBySellerIdAndDeletedAtIsNull(sellerId);
+        products.forEach(p -> p.setVisible(false));
+        productRepository.saveAll(products);
+        return products.size();
     }
 
     @Transactional(readOnly = true)
