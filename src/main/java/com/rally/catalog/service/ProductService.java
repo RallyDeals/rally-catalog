@@ -122,17 +122,20 @@ public class ProductService {
     @Transactional(readOnly = true)
     public ProductResponse getProduct(String id, Role viewerRole, UUID viewerId) {
         Product product = findById(id);
+        ProductResponse response;
         if (viewerRole == Role.ADMIN) {
-            return catalogMapper.toProductResponse(product);
-        }
-        if (viewerRole == Role.SELLER && viewerId != null
+            response = catalogMapper.toProductResponse(product);
+        } else if (viewerRole == Role.SELLER && viewerId != null
                 && product.getSellerId().equals(viewerId)) {
-            return catalogMapper.toProductResponse(product);
+            response = catalogMapper.toProductResponse(product);
+        } else if (product.getStatus() == ProductStatus.APPROVED && !product.isDeleted() && product.isVisible()) {
+            response = catalogMapper.toProductResponse(product);
+        } else {
+            throw new ProductNotFoundException(id);
         }
-        if (product.getStatus() == ProductStatus.APPROVED && !product.isDeleted() && product.isVisible()) {
-            return catalogMapper.toProductResponse(product);
-        }
-        throw new ProductNotFoundException(id);
+
+        response.setActiveDeals(dealServiceClient.getActiveDealsForProduct(product.getId()));
+        return response;
     }
 
     public ProductResponse updateProduct(String id, UUID sellerId, ProductUpdateRequest request) {

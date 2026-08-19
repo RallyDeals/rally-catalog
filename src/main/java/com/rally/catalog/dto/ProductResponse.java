@@ -1,5 +1,6 @@
 package com.rally.catalog.dto;
 
+import com.rally.catalog.client.dto.DealActiveSummary;
 import com.rally.catalog.entity.ProductStatus;
 import lombok.Getter;
 import lombok.Setter;
@@ -31,4 +32,5 @@ public class ProductResponse {
     private LocalDateTime updatedAt;
     private boolean deleted;
     private LocalDateTime deletedAt;
+    private List<DealActiveSummary> activeDeals;
 }

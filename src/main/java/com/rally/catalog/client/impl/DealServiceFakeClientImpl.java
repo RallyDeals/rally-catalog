@@ -1,9 +1,13 @@
 package com.rally.catalog.client.impl;
 
 import com.rally.catalog.client.DealServiceClient;
+import com.rally.catalog.client.dto.DealActiveSummary;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
+
+import java.util.Collections;
+import java.util.List;
 
 @Component
 @Profile("!prod")
@@ -15,5 +19,10 @@ public class DealServiceFakeClientImpl implements DealServiceClient {
     @Override
     public boolean hasActiveDeal(String productId) {
         return hasActiveDeal;
+    }
+
+    @Override
+    public List<DealActiveSummary> getActiveDealsForProduct(String productId) {
+        return Collections.emptyList();
     }
 }
