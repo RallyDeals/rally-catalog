@@ -20,7 +20,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-@Profile("prod")
+@Profile("!stub")
 @Component
 @RequiredArgsConstructor
 public class DealServiceClientImpl implements DealServiceClient {

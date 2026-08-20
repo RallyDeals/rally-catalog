@@ -10,7 +10,7 @@ import java.util.Collections;
 import java.util.List;
 
 @Component
-@Profile("!prod")
+@Profile("stub")
 public class DealServiceFakeClientImpl implements DealServiceClient {
 
     @Value("${deal.service.mock.has-active-deal:false}")
