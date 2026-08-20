@@ -1,6 +1,6 @@
 package com.rally.catalog.service;
 
-import com.rally.catalog.client.DealServiceClient;
+import com.rally.catalog.repository.ProductActiveDealRepository;
 import com.rally.catalog.dto.PageResponse;
 import com.rally.catalog.dto.ProductLookupResponse;
 import com.rally.catalog.dto.ProductRequest;
@@ -60,7 +60,7 @@ class ProductServiceTest {
     private CategoryRepository categoryRepository;
 
     @Mock
-    private DealServiceClient dealServiceClient;
+    private ProductActiveDealRepository productActiveDealRepository;
 
     @Mock
     private KafkaTemplate<String, ProductCreatedEvent> productCreatedKafkaTemplate;
@@ -78,7 +78,7 @@ class ProductServiceTest {
     @BeforeEach
     void setUp() {
         productService = new ProductService(
-                productRepository, categoryRepository, new CatalogMapperImpl(), dealServiceClient,
+                productRepository, categoryRepository, new CatalogMapperImpl(), productActiveDealRepository,
                 productCreatedKafkaTemplate, productDeletedKafkaTemplate);
     }
 
@@ -340,7 +340,7 @@ class ProductServiceTest {
         Product approved = product(ProductStatus.APPROVED);
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
         when(productRepository.save(any(Product.class))).thenReturn(approved);
-        when(dealServiceClient.hasActiveDeal("prod-1")).thenReturn(false);
+        when(productActiveDealRepository.existsByProductIdAndStatusIn("prod-1", List.of("PENDING", "ACTIVE"))).thenReturn(false);
 
         productService.deleteProduct("prod-1", SELLER);
 
@@ -352,7 +352,7 @@ class ProductServiceTest {
     void deleteProduct_shouldRejectWhenTiedToActiveDeal() {
         Product approved = product(ProductStatus.APPROVED);
         when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
-        when(dealServiceClient.hasActiveDeal("prod-1")).thenReturn(true);
+        when(productActiveDealRepository.existsByProductIdAndStatusIn("prod-1", List.of("PENDING", "ACTIVE"))).thenReturn(true);
 
         assertThrows(ConflictException.class, () -> productService.deleteProduct("prod-1", SELLER));
 

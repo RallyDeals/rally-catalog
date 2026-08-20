@@ -1,14 +1,15 @@
 package com.rally.catalog.service;
 
+import com.rally.catalog.client.dto.DealActiveSummary;
 import com.rally.catalog.dto.PageResponse;
 import com.rally.catalog.dto.ProductLookupItem;
 import com.rally.catalog.dto.ProductLookupResponse;
 import com.rally.catalog.dto.ProductRequest;
 import com.rally.catalog.dto.ProductResponse;
-import com.rally.catalog.client.DealServiceClient;
 import com.rally.catalog.dto.ProductUpdateRequest;
 import com.rally.catalog.entity.Category;
 import com.rally.catalog.entity.Product;
+import com.rally.catalog.entity.ProductActiveDeal;
 import com.rally.catalog.entity.ProductStatus;
 import com.rally.catalog.entity.Role;
 import com.rally.catalog.event.ProductCreatedEvent;
@@ -21,6 +22,7 @@ import com.rally.common.exceptions.domain.catalog.ProductNotOwnedException;
 import com.rally.common.exceptions.shared.BadRequestException;
 import com.rally.common.exceptions.shared.NotFoundException;
 import com.rally.catalog.repository.CategoryRepository;
+import com.rally.catalog.repository.ProductActiveDealRepository;
 import com.rally.catalog.repository.ProductRepository;
 import com.rally.catalog.repository.ProductSpecifications;
 import org.springframework.data.domain.Page;
@@ -50,21 +52,23 @@ public class ProductService {
     private static final String PRODUCT_CREATED_TOPIC = "product-created";
     private static final String PRODUCT_DELETED_TOPIC = "product-deleted";
 
+    private static final List<String> ACTIVE_DEAL_STATUSES = List.of("PENDING", "ACTIVE");
+
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final CatalogMapper catalogMapper;
-    private final DealServiceClient dealServiceClient;
+    private final ProductActiveDealRepository productActiveDealRepository;
     private final KafkaTemplate<String, ProductCreatedEvent> productCreatedKafkaTemplate;
     private final KafkaTemplate<String, ProductDeletedEvent> productDeletedKafkaTemplate;
 
     public ProductService(ProductRepository productRepository, CategoryRepository categoryRepository,
-                          CatalogMapper catalogMapper, DealServiceClient dealServiceClient,
+                          CatalogMapper catalogMapper, ProductActiveDealRepository productActiveDealRepository,
                           KafkaTemplate<String, ProductCreatedEvent> productCreatedKafkaTemplate,
                           KafkaTemplate<String, ProductDeletedEvent> productDeletedKafkaTemplate) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.catalogMapper = catalogMapper;
-        this.dealServiceClient = dealServiceClient;
+        this.productActiveDealRepository = productActiveDealRepository;
         this.productCreatedKafkaTemplate = productCreatedKafkaTemplate;
         this.productDeletedKafkaTemplate = productDeletedKafkaTemplate;
     }
@@ -134,7 +138,8 @@ public class ProductService {
             throw new ProductNotFoundException(id);
         }
 
-        response.setActiveDeals(dealServiceClient.getActiveDealsForProduct(product.getId()));
+        response.setActiveDeals(toDealSummaries(
+                productActiveDealRepository.findByProductIdAndStatusIn(product.getId(), ACTIVE_DEAL_STATUSES)));
         return response;
     }
 
@@ -162,10 +167,8 @@ public class ProductService {
         if (product.isDeleted()) {
             throw new GoneException("Product already deleted");
         }
-        // Contract: Deal Service GET /internal/deals?productId={id}&active=true (§10.1 of
-        // catalog-service.md). Mocked by DealServiceFakeClientImpl outside the prod profile
-        // (deal.service.mock.has-active-deal); real client under prod (deal.service.url).
-        if (dealServiceClient.hasActiveDeal(product.getId())) {
+        // Guard: prevent deletion when product has active deals (PENDING or ACTIVE)
+        if (productActiveDealRepository.existsByProductIdAndStatusIn(product.getId(), ACTIVE_DEAL_STATUSES)) {
             throw new ConflictException("Product is tied to an active deal and cannot be deleted");
         }
         product.setDeletedAt(LocalDateTime.now());
@@ -303,9 +306,31 @@ public class ProductService {
     }
 
     private PageResponse<ProductResponse> toPageResponse(Page<Product> page) {
-        List<ProductResponse> items = page.getContent().stream()
-                .map(catalogMapper::toProductResponse)
-                .collect(Collectors.toList());
+        List<String> productIds = page.getContent().stream().map(Product::getId).toList();
+        List<ProductActiveDeal> allDeals = productActiveDealRepository.findByProductIdInAndStatusIn(productIds, ACTIVE_DEAL_STATUSES);
+        Map<String, List<ProductActiveDeal>> dealsByProduct = allDeals.stream()
+                .collect(Collectors.groupingBy(ProductActiveDeal::getProductId));
+
+        List<ProductResponse> items = page.getContent().stream().map(p -> {
+            ProductResponse r = catalogMapper.toProductResponse(p);
+            r.setActiveDeals(toDealSummaries(dealsByProduct.getOrDefault(p.getId(), List.of())));
+            return r;
+        }).collect(Collectors.toList());
         return new PageResponse<>(items, page.getNumber() + 1, page.getSize(), page.getTotalElements());
+    }
+
+    private List<DealActiveSummary> toDealSummaries(List<ProductActiveDeal> deals) {
+        return deals.stream().map(d -> {
+            DealActiveSummary s = new DealActiveSummary();
+            s.setDealId(d.getDealId());
+            s.setDealPrice(d.getDealPrice());
+            s.setDealStock(d.getDealStock());
+            s.setCurrentParticipants(d.getCurrentParticipants());
+            s.setMinParticipants(d.getMinParticipants());
+            s.setStatus(d.getStatus());
+            s.setEndTime(d.getEndTime());
+            s.setDurationMinutes(d.getDurationMinutes());
+            return s;
+        }).toList();
     }
 }

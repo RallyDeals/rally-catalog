@@ -61,4 +61,24 @@ public class KafkaConsumerConfig {
         factory.setConsumerFactory(sellerBannedConsumerFactory());
         return factory;
     }
+
+    @Bean
+    public ConsumerFactory<String, String> dealEventConsumerFactory() {
+        Map<String, Object> props = consumerProperties();
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId + "-deal-events");
+        return new DefaultKafkaConsumerFactory<>(
+                props,
+                new StringDeserializer(),
+                new StringDeserializer()
+        );
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, String>
+    dealEventKafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, String> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(dealEventConsumerFactory());
+        return factory;
+    }
 }

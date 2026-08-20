@@ -14,12 +14,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Profile("!stub")
 @Component
 @RequiredArgsConstructor
@@ -38,10 +40,12 @@ public class DealServiceClientImpl implements DealServiceClient {
             ResponseEntity<DealActiveResponse> response = restTemplate.getForEntity(
                     url, DealActiveResponse.class, productId);
             return response.getBody() != null && response.getBody().hasActiveDeal();
-        } catch (ResourceAccessException resourceAccessException) {
-            throw new ServiceUnavailableException("Deal service is unavailable");
-        } catch (HttpServerErrorException serverErrorException) {
-            throw new InternalServerErrorException("Deal service returned server error");
+        } catch (ResourceAccessException e) {
+            log.warn("Deal service unavailable checking active deal for product {}: {}", productId, e.getMessage());
+            return false;
+        } catch (HttpServerErrorException e) {
+            log.warn("Deal service returned error checking active deal for product {}: {}", productId, e.getMessage());
+            return false;
         }
     }
 
@@ -67,9 +71,11 @@ public class DealServiceClientImpl implements DealServiceClient {
 
             return content.stream().map(this::mapToSummary).toList();
         } catch (ResourceAccessException e) {
-            throw new ServiceUnavailableException("Deal service is unavailable");
+            log.warn("Deal service unavailable while fetching active deals for product {}: {}", productId, e.getMessage());
+            return Collections.emptyList();
         } catch (HttpServerErrorException e) {
-            throw new InternalServerErrorException("Deal service returned server error");
+            log.warn("Deal service returned error for product {}: {}", productId, e.getMessage());
+            return Collections.emptyList();
         }
     }
 
