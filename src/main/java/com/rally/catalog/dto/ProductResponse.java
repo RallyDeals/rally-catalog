@@ -7,13 +7,14 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Getter
 @Setter
 public class ProductResponse {
 
     private String id;
-    private String sellerId;
+    private UUID sellerId;
     private String sellerName;
     private String name;
     private String description;

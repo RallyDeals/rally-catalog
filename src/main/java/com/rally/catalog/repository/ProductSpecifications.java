@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Query building with the JPA Criteria API (Hibernate generates the SQL from
@@ -62,7 +63,7 @@ public final class ProductSpecifications {
                 : cb.isMember(tag.trim(), root.get("tags"));
     }
 
-    public static Specification<Product> sellerIs(String sellerId) {
+    public static Specification<Product> sellerIs(UUID sellerId) {
         return (root, query, cb) -> sellerId == null
                 ? null
                 : cb.equal(root.get("sellerId"), sellerId);

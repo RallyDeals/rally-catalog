@@ -16,23 +16,35 @@ services:
       timeout: 5s
       retries: 10
 
-# catalog-service: commented out for local dev — run the app from IntelliJ, use only catalog-db from Docker.
-#   catalog-service:
-#     build: .
-#     container_name: catalog-service
-#     depends_on:
-#       catalog-db:
-#         condition: service_healthy
-#     environment:
-#       DB_HOST: catalog-db
-#       DB_PORT: 5432
-#       DB_NAME: catalog_db
-#       DB_USER: postgres
-#       DB_PASSWORD: postgres
-#       JAVA_TOOL_OPTIONS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
-#     ports:
-#       - "8083:8083"
-#       - "5005:5005"
+  catalog-service:
+    build:
+      context: .
+      args:
+        GITHUB_ACTOR: ${GITHUB_ACTOR}
+      secrets:
+        - github_token
+    container_name: catalog-service
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+    environment:
+      DB_HOST: catalog-db
+      DB_PORT: 5432
+      DB_NAME: catalog_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DEAL_SERVICE_URL: http://deal-service:8081   # 👈 added this
+    ports:
+      - "8083:8083"
+
+secrets:
+  github_token:
+    environment: GITHUB_TOKEN
 
 volumes:
   catalog-db-data:
+
+networks:
+  default:
+    name: groupdeal-net
+    external: true

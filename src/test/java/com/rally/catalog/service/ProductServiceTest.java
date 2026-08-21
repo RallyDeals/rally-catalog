@@ -10,6 +10,8 @@ import com.rally.catalog.entity.Category;
 import com.rally.catalog.entity.Product;
 import com.rally.catalog.entity.ProductStatus;
 import com.rally.catalog.entity.Role;
+import com.rally.catalog.event.ProductCreatedEvent;
+import com.rally.catalog.event.ProductDeletedEvent;
 import com.rally.catalog.exception.GoneException;
 import com.rally.catalog.mapper.CatalogMapperImpl;
 import com.rally.catalog.repository.CategoryRepository;
@@ -29,6 +31,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.kafka.core.KafkaTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -59,6 +62,12 @@ class ProductServiceTest {
     @Mock
     private DealServiceClient dealServiceClient;
 
+    @Mock
+    private KafkaTemplate<String, ProductCreatedEvent> productCreatedKafkaTemplate;
+
+    @Mock
+    private KafkaTemplate<String, ProductDeletedEvent> productDeletedKafkaTemplate;
+
     private ProductService productService;
     private InternalProductService internalProductService;
 
@@ -70,7 +79,8 @@ class ProductServiceTest {
     @BeforeEach
     void setUp() {
         productService = new ProductService(
-                productRepository, categoryRepository, new CatalogMapperImpl(), dealServiceClient);
+                productRepository, categoryRepository, new CatalogMapperImpl(), dealServiceClient,
+                productCreatedKafkaTemplate, productDeletedKafkaTemplate);
         internalProductService = new InternalProductService(new CatalogMapperImpl(), productRepository);
     }
 
@@ -82,7 +92,7 @@ class ProductServiceTest {
 
     private Product product(ProductStatus status) {
         Product product = new Product(
-                SELLER.toString(), "Jane Seller", "Headphones", "Noise cancelling", category(),
+                SELLER, "Jane Seller", "Headphones", "Noise cancelling", category(),
                 new BigDecimal("79.99"), "https://cdn.example.com/img.jpg");
         product.setId("prod-1");
         product.setStatus(status);
@@ -107,7 +117,7 @@ class ProductServiceTest {
         ProductResponse response = productService.createProduct(SELLER, "Jane Seller", request);
 
         assertEquals(ProductStatus.PENDING_APPROVAL, response.getStatus());
-        assertEquals("11111111-1111-4111-8111-111111111111", response.getSellerId());
+        assertEquals(UUID.fromString("11111111-1111-4111-8111-111111111111"), response.getSellerId());
         assertEquals("Jane Seller", response.getSellerName());
         assertEquals("Electronics", response.getCategory().getName());
     }

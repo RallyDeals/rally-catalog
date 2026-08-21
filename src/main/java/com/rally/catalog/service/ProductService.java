@@ -2,10 +2,13 @@ package com.rally.catalog.service;
 
 import com.rally.catalog.dto.*;
 import com.rally.catalog.client.DealServiceClient;
+import com.rally.catalog.dto.ProductUpdateRequest;
 import com.rally.catalog.entity.Category;
 import com.rally.catalog.entity.Product;
 import com.rally.catalog.entity.ProductStatus;
 import com.rally.catalog.entity.Role;
+import com.rally.catalog.event.ProductCreatedEvent;
+import com.rally.catalog.event.ProductDeletedEvent;
 import com.rally.catalog.exception.GoneException;
 import com.rally.catalog.mapper.CatalogMapper;
 import com.rally.common.exceptions.shared.ConflictException;
@@ -21,6 +24,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,23 +41,32 @@ public class ProductService {
 
     private static final Set<String> SORTABLE_FIELDS = Set.of("createdAt", "basePrice", "name");
 
+    private static final String PRODUCT_CREATED_TOPIC = "product-created";
+    private static final String PRODUCT_DELETED_TOPIC = "product-deleted";
+
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final CatalogMapper catalogMapper;
     private final DealServiceClient dealServiceClient;
+    private final KafkaTemplate<String, ProductCreatedEvent> productCreatedKafkaTemplate;
+    private final KafkaTemplate<String, ProductDeletedEvent> productDeletedKafkaTemplate;
 
     public ProductService(ProductRepository productRepository, CategoryRepository categoryRepository,
-                          CatalogMapper catalogMapper, DealServiceClient dealServiceClient) {
+                          CatalogMapper catalogMapper, DealServiceClient dealServiceClient,
+                          KafkaTemplate<String, ProductCreatedEvent> productCreatedKafkaTemplate,
+                          KafkaTemplate<String, ProductDeletedEvent> productDeletedKafkaTemplate) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.catalogMapper = catalogMapper;
         this.dealServiceClient = dealServiceClient;
+        this.productCreatedKafkaTemplate = productCreatedKafkaTemplate;
+        this.productDeletedKafkaTemplate = productDeletedKafkaTemplate;
     }
 
     public ProductResponse createProduct(UUID sellerId, String sellerName, ProductRequest request) {
         Category category = findCategory(request.getCategoryId());
         Product product = new Product(
-                sellerId.toString(),
+                sellerId,
                 sellerName,
                 request.getName(),
                 request.getDescription(),
@@ -73,7 +86,15 @@ public class ProductService {
         if (request.getTags() != null) {
             product.setTags(request.getTags());
         }
-        return catalogMapper.toProductResponse(productRepository.save(product));
+
+        Product saved = productRepository.save(product);
+
+        if (request.getInitialStock() != null && request.getInitialStock() > 0) {
+            productCreatedKafkaTemplate.send(PRODUCT_CREATED_TOPIC,
+                    new ProductCreatedEvent(saved.getId(), request.getInitialStock()));
+        }
+
+        return catalogMapper.toProductResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -88,7 +109,7 @@ public class ProductService {
                 ProductSpecifications.keyword(q),
                 ProductSpecifications.tagIs(tag),
                 ProductSpecifications.categoryIs(categoryId),
-                ProductSpecifications.sellerIs(sellerId == null ? null : sellerId.toString()),
+                ProductSpecifications.sellerIs(sellerId),
                 ProductSpecifications.priceBetween(minPrice, maxPrice));
         return toPageResponse(productRepository.findAll(spec, pageable));
     }
@@ -100,7 +121,7 @@ public class ProductService {
             return catalogMapper.toProductResponse(product);
         }
         if (viewerRole == Role.SELLER && viewerId != null
-                && product.getSellerId().equals(viewerId.toString())) {
+                && product.getSellerId().equals(viewerId)) {
             return catalogMapper.toProductResponse(product);
         }
         if (product.getStatus() == ProductStatus.APPROVED && !product.isDeleted() && product.isVisible()) {
@@ -110,7 +131,7 @@ public class ProductService {
     }
 
     public ProductResponse updateProduct(String id, UUID sellerId, ProductUpdateRequest request) {
-        Product product = findOwned(id, sellerId.toString());
+        Product product = findOwned(id, sellerId);
         if (product.isDeleted()) {
             throw new GoneException("Product already deleted");
         }
@@ -129,7 +150,7 @@ public class ProductService {
     }
 
     public void deleteProduct(String id, UUID sellerId) {
-        Product product = findOwned(id, sellerId.toString());
+        Product product = findOwned(id, sellerId);
         if (product.isDeleted()) {
             throw new GoneException("Product already deleted");
         }
@@ -141,10 +162,13 @@ public class ProductService {
         }
         product.setDeletedAt(LocalDateTime.now());
         productRepository.save(product);
+
+        productDeletedKafkaTemplate.send(PRODUCT_DELETED_TOPIC,
+                new ProductDeletedEvent(product.getId()));
     }
 
     public ProductResponse restoreProduct(String id, UUID sellerId) {
-        Product product = findOwned(id, sellerId.toString());
+        Product product = findOwned(id, sellerId);
         if (!product.isDeleted()) {
             throw new ConflictException("Product is not deleted");
         }
@@ -174,12 +198,16 @@ public class ProductService {
         return catalogMapper.toProductResponse(productRepository.save(product));
     }
 
+    public int setSellerProductsInvisible(UUID sellerId) {
+        return productRepository.setAllInvisibleBySellerId(sellerId.toString());
+    }
+
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> listSellerProducts(
             UUID sellerId, ProductStatus status, boolean includeDeleted, boolean deletedOnly,
             String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
-        Specification<Product> spec = Specification.allOf(ProductSpecifications.sellerIs(sellerId.toString()));
+        Specification<Product> spec = Specification.allOf(ProductSpecifications.sellerIs(sellerId));
         if (deletedOnly) {
             spec = spec.and(ProductSpecifications.deletedOnly());
         } else {
@@ -200,7 +228,7 @@ public class ProductService {
         return toPageResponse(productRepository.findAll(spec, pageable));
     }
 
-    private Product findOwned(String id, String sellerId) {
+    private Product findOwned(String id, UUID sellerId) {
         Product product = findById(id);
         if (!product.getSellerId().equals(sellerId)) {
             throw new ProductNotOwnedException(id);
