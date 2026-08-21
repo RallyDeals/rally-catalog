@@ -3,6 +3,8 @@ package com.rally.catalog.dto;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter
 @Setter
 public class DealProductResponse {
@@ -13,4 +15,5 @@ public class DealProductResponse {
     private CategoryResponse category;
     private String sku;
     private String productImageUrl;
+    private List<String> productImages;
 }

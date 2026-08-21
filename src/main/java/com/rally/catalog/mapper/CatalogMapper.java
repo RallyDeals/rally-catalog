@@ -20,6 +20,7 @@ public interface CatalogMapper {
 
     @Mapping(target = "productName", source = "name")
     @Mapping(target = "productImageUrl", source = "imageUrl")
+    @Mapping(target = "productImages", source = "images")
     DealProductResponse toDealProductResponse(Product product);
 
     CategoryResponse toCategoryResponse(Category category);
