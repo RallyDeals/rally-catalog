@@ -1,9 +1,6 @@
 package com.rally.catalog.mapper;
 
-import com.rally.catalog.dto.CategoryResponse;
-import com.rally.catalog.dto.ProductLookupItem;
-import com.rally.catalog.dto.ProductResponse;
-import com.rally.catalog.dto.ProductUpdateRequest;
+import com.rally.catalog.dto.*;
 import com.rally.catalog.entity.Category;
 import com.rally.catalog.entity.Product;
 import org.mapstruct.BeanMapping;
@@ -20,6 +17,10 @@ public interface CatalogMapper {
     ProductResponse toProductResponse(Product product);
 
     List<ProductResponse> toProductResponses(List<Product> products);
+
+    @Mapping(target = "productName", source = "name")
+    @Mapping(target = "productImageUrl", source = "imageUrl")
+    DealProductResponse toDealProductResponse(Product product);
 
     CategoryResponse toCategoryResponse(Category category);
 

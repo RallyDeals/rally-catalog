@@ -60,6 +60,7 @@ class ProductServiceTest {
     private DealServiceClient dealServiceClient;
 
     private ProductService productService;
+    private InternalProductService internalProductService;
 
     private static final UUID SELLER = UUID.fromString("11111111-1111-4111-8111-111111111111");
     private static final UUID BUYER = UUID.fromString("22222222-2222-4222-8222-222222222222");
@@ -70,6 +71,7 @@ class ProductServiceTest {
     void setUp() {
         productService = new ProductService(
                 productRepository, categoryRepository, new CatalogMapperImpl(), dealServiceClient);
+        internalProductService = new InternalProductService(new CatalogMapperImpl(), productRepository);
     }
 
     private Category category() {
@@ -514,7 +516,7 @@ class ProductServiceTest {
         Product approved = product(ProductStatus.APPROVED);
         when(productRepository.findAll(any(Specification.class))).thenReturn(List.of(approved));
 
-        ProductLookupResponse response = productService.lookupProducts(List.of("prod-1", "prod-2"));
+        ProductLookupResponse response = internalProductService.lookupProducts(List.of("prod-1", "prod-2"));
 
         assertEquals(1, response.getFound().size());
         assertTrue(response.getFound().containsKey("prod-1"));
@@ -528,7 +530,7 @@ class ProductServiceTest {
         approved.setImages(List.of("https://cdn.example.com/one.jpg", "https://cdn.example.com/two.jpg"));
         when(productRepository.findAll(any(Specification.class))).thenReturn(List.of(approved));
 
-        ProductLookupResponse response = productService.lookupProducts(List.of("prod-1"));
+        ProductLookupResponse response = internalProductService.lookupProducts(List.of("prod-1"));
 
         assertEquals("https://cdn.example.com/one.jpg", response.getFound().get("prod-1").getImageUrl());
     }
@@ -538,14 +540,14 @@ class ProductServiceTest {
         Product approved = product(ProductStatus.APPROVED);
         when(productRepository.findAll(any(Specification.class))).thenReturn(List.of(approved));
 
-        ProductLookupResponse response = productService.lookupProducts(List.of("prod-1"));
+        ProductLookupResponse response = internalProductService.lookupProducts(List.of("prod-1"));
 
         assertEquals("https://cdn.example.com/img.jpg", response.getFound().get("prod-1").getImageUrl());
     }
 
     @Test
     void lookupProducts_shouldRejectEmpty() {
-        assertThrows(BadRequestException.class, () -> productService.lookupProducts(List.of()));
+        assertThrows(BadRequestException.class, () -> internalProductService.lookupProducts(List.of()));
     }
 
     @Test
@@ -553,6 +555,6 @@ class ProductServiceTest {
         List<String> tooMany = java.util.stream.IntStream.rangeClosed(1, 51)
                 .mapToObj(String::valueOf).toList();
 
-        assertThrows(BadRequestException.class, () -> productService.lookupProducts(tooMany));
+        assertThrows(BadRequestException.class, () -> internalProductService.lookupProducts(tooMany));
     }
 }
