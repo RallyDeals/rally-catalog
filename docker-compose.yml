@@ -34,6 +34,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DEAL_SERVICE_URL: http://deal-service:8081   # 👈 added this
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     ports:
       - "8083:8083"
 
