@@ -1,10 +1,6 @@
 package com.rally.catalog.service;
 
-import com.rally.catalog.dto.PageResponse;
-import com.rally.catalog.dto.ProductLookupItem;
-import com.rally.catalog.dto.ProductLookupResponse;
-import com.rally.catalog.dto.ProductRequest;
-import com.rally.catalog.dto.ProductResponse;
+import com.rally.catalog.dto.*;
 import com.rally.catalog.client.DealServiceClient;
 import com.rally.catalog.dto.ProductUpdateRequest;
 import com.rally.catalog.entity.Category;
@@ -34,9 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -109,13 +103,14 @@ public class ProductService {
             BigDecimal minPrice, BigDecimal maxPrice,
             String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
-        Specification<Product> spec = Specification.where(ProductSpecifications.approvedAndNotDeleted())
-                .and(ProductSpecifications.visible(true))
-                .and(ProductSpecifications.keyword(q))
-                .and(ProductSpecifications.tagIs(tag))
-                .and(ProductSpecifications.categoryIs(categoryId))
-                .and(ProductSpecifications.sellerIs(sellerId))
-                .and(ProductSpecifications.priceBetween(minPrice, maxPrice));
+        Specification<Product> spec = Specification.allOf(
+                ProductSpecifications.approvedAndNotDeleted(),
+                ProductSpecifications.visible(true),
+                ProductSpecifications.keyword(q),
+                ProductSpecifications.tagIs(tag),
+                ProductSpecifications.categoryIs(categoryId),
+                ProductSpecifications.sellerIs(sellerId),
+                ProductSpecifications.priceBetween(minPrice, maxPrice));
         return toPageResponse(productRepository.findAll(spec, pageable));
     }
 
@@ -212,7 +207,7 @@ public class ProductService {
             UUID sellerId, ProductStatus status, boolean includeDeleted, boolean deletedOnly,
             String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
-        Specification<Product> spec = Specification.where(ProductSpecifications.sellerIs(sellerId));
+        Specification<Product> spec = Specification.allOf(ProductSpecifications.sellerIs(sellerId));
         if (deletedOnly) {
             spec = spec.and(ProductSpecifications.deletedOnly());
         } else {
@@ -227,35 +222,10 @@ public class ProductService {
     public PageResponse<ProductResponse> listAdminProducts(
             ProductStatus status, boolean includeDeleted, String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
-        Specification<Product> spec = Specification.where(ProductSpecifications.statusIs(status))
-                .and(ProductSpecifications.notDeleted(includeDeleted));
+        Specification<Product> spec = Specification.allOf(
+                ProductSpecifications.statusIs(status),
+                ProductSpecifications.notDeleted(includeDeleted));
         return toPageResponse(productRepository.findAll(spec, pageable));
-    }
-
-    @Transactional(readOnly = true)
-    public ProductLookupResponse lookupProducts(List<String> ids) {
-        if (ids == null || ids.isEmpty()) {
-            throw new BadRequestException("productIds must not be empty");
-        }
-        if (ids.size() > 50) {
-            throw new BadRequestException("At most 50 product IDs per lookup");
-        }
-
-        Set<String> uniqueIds = new LinkedHashSet<>(ids);
-        Specification<Product> spec = ProductSpecifications.idIn(uniqueIds)
-                .and(ProductSpecifications.approvedAndNotDeleted());
-        List<Product> found = productRepository.findAll(spec);
-        Map<String, ProductLookupItem> foundMap = found.stream()
-                .collect(Collectors.toMap(
-                        Product::getId,
-                        catalogMapper::toProductLookupItem));
-
-        ProductLookupResponse response = new ProductLookupResponse();
-        response.setFound(foundMap);
-        response.setNotFound(uniqueIds.stream()
-                .filter(id -> !foundMap.containsKey(id))
-                .collect(Collectors.toList()));
-        return response;
     }
 
     private Product findOwned(String id, UUID sellerId) {

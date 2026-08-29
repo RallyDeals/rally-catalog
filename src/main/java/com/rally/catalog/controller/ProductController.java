@@ -1,13 +1,6 @@
 package com.rally.catalog.controller;
 
-import com.rally.catalog.dto.PageResponse;
-import com.rally.catalog.dto.ImageUploadResponse;
-import com.rally.catalog.dto.ProductLookupRequest;
-import com.rally.catalog.dto.ProductLookupResponse;
-import com.rally.catalog.dto.ProductRequest;
-import com.rally.catalog.dto.ProductResponse;
-import com.rally.catalog.dto.ProductUpdateRequest;
-import com.rally.catalog.dto.RejectRequest;
+import com.rally.catalog.dto.*;
 import com.rally.catalog.entity.ProductStatus;
 import com.rally.catalog.entity.Role;
 import com.rally.catalog.service.ImageStorageService;
@@ -109,12 +102,6 @@ public class ProductController {
             @PathVariable String id,
             @RequestHeader("X-User-Id") UUID sellerId) {
         return ResponseEntity.ok(productService.restoreProduct(id, sellerId));
-    }
-
-    @PostMapping("/lookup")
-    public ResponseEntity<ProductLookupResponse> lookupProducts(
-            @Valid @RequestBody ProductLookupRequest request) {
-        return ResponseEntity.ok(productService.lookupProducts(request.getProductIds()));
     }
 
     @GetMapping("/sellers/{sellerId}")

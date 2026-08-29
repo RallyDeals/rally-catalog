@@ -1,9 +1,6 @@
 package com.rally.catalog.mapper;
 
-import com.rally.catalog.dto.CategoryResponse;
-import com.rally.catalog.dto.ProductLookupItem;
-import com.rally.catalog.dto.ProductResponse;
-import com.rally.catalog.dto.ProductUpdateRequest;
+import com.rally.catalog.dto.*;
 import com.rally.catalog.entity.Category;
 import com.rally.catalog.entity.Product;
 import org.mapstruct.BeanMapping;
@@ -20,6 +17,11 @@ public interface CatalogMapper {
     ProductResponse toProductResponse(Product product);
 
     List<ProductResponse> toProductResponses(List<Product> products);
+
+    @Mapping(target = "productName", source = "name")
+    @Mapping(target = "productImageUrl", source = "imageUrl")
+    @Mapping(target = "productImages", source = "images")
+    DealProductResponse toDealProductResponse(Product product);
 
     CategoryResponse toCategoryResponse(Category category);
 
@@ -43,6 +45,14 @@ public interface CatalogMapper {
     }
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "category", ignore = true)
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "sellerId", ignore = true)
+    @Mapping(target = "sellerName", ignore = true)
+    @Mapping(target = "category", ignore = true) // resolved separately from categoryId
+    @Mapping(target = "status", ignore = true)
+    @Mapping(target = "rejectionReason", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "deletedAt", ignore = true)
     void applyUpdate(@MappingTarget Product product, ProductUpdateRequest request);
 }
