@@ -9,11 +9,12 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.UUID;
 
 @Repository
-public interface ProductRepository extends JpaRepository<Product, String>, JpaSpecificationExecutor<Product> {
+public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpecificationExecutor<Product> {
 
-    long countByCategoryId(String categoryId);
+    long countByCategoryId(UUID categoryId);
 
     @Query("SELECT p.category.id, COUNT(p) FROM Product p WHERE p.deletedAt IS NULL GROUP BY p.category.id")
     List<Object[]> countProductsGroupedByCategory();
@@ -21,5 +22,5 @@ public interface ProductRepository extends JpaRepository<Product, String>, JpaSp
     @Modifying
     @Query("UPDATE Product p SET p.visible = false, p.updatedAt = CURRENT_TIMESTAMP " +
            "WHERE p.sellerId = :sellerId AND p.deletedAt IS NULL")
-    int setAllInvisibleBySellerId(@Param("sellerId") String sellerId);
+    int setAllInvisibleBySellerId(@Param("sellerId") UUID sellerId);
 }

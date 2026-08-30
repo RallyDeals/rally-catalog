@@ -19,6 +19,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,14 +31,14 @@ public class InternalProductService {
 
 
     @Transactional
-    public DealProductResponse getDealProductResponse(String id) {
+    public DealProductResponse getDealProductResponse(UUID id) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new ProductNotFoundException(id));
+                .orElseThrow(() -> new ProductNotFoundException(id.toString()));
         return catalogMapper.toDealProductResponse(product);
     }
 
     @Transactional(readOnly = true)
-    public ProductLookupResponse lookupProducts(List<String> ids) {
+    public ProductLookupResponse lookupProducts(List<UUID> ids) {
         if (ids == null || ids.isEmpty()) {
             throw new BadRequestException("productIds must not be empty");
         }
@@ -45,11 +46,11 @@ public class InternalProductService {
             throw new BadRequestException("At most 50 product IDs per lookup");
         }
 
-        Set<String> uniqueIds = new LinkedHashSet<>(ids);
+        Set<UUID> uniqueIds = new LinkedHashSet<>(ids);
         Specification<Product> spec = ProductSpecifications.idIn(uniqueIds)
                 .and(ProductSpecifications.approvedAndNotDeleted());
         List<Product> found = productRepository.findAll(spec);
-        Map<String, ProductLookupItem> foundMap = found.stream()
+        Map<UUID, ProductLookupItem> foundMap = found.stream()
                 .collect(Collectors.toMap(
                         Product::getId,
                         catalogMapper::toProductLookupItem));

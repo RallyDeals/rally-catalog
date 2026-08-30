@@ -9,6 +9,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -20,7 +21,7 @@ public class ProductRequest {
     private String description;
 
     @NotNull(message = "Category is required")
-    private String categoryId;
+    private UUID categoryId;
 
     @NotNull(message = "Base price is required")
     @DecimalMin(value = "0.01", message = "Base price must be positive")

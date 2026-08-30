@@ -91,7 +91,7 @@ public class ProductService {
 
         if (request.getInitialStock() != null && request.getInitialStock() > 0) {
             productCreatedKafkaTemplate.send(PRODUCT_CREATED_TOPIC,
-                    new ProductCreatedEvent(saved.getId(), request.getInitialStock()));
+                    new ProductCreatedEvent(saved.getId().toString(), request.getInitialStock()));
         }
 
         return catalogMapper.toProductResponse(saved);
@@ -99,7 +99,7 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> searchProducts(
-            String q, String tag, String categoryId, UUID sellerId,
+            String q, String tag, UUID categoryId, UUID sellerId,
             BigDecimal minPrice, BigDecimal maxPrice,
             String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
@@ -115,7 +115,7 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public ProductResponse getProduct(String id, Role viewerRole, UUID viewerId) {
+    public ProductResponse getProduct(UUID id, Role viewerRole, UUID viewerId) {
         Product product = findById(id);
         if (viewerRole == Role.ADMIN) {
             return catalogMapper.toProductResponse(product);
@@ -127,10 +127,10 @@ public class ProductService {
         if (product.getStatus() == ProductStatus.APPROVED && !product.isDeleted() && product.isVisible()) {
             return catalogMapper.toProductResponse(product);
         }
-        throw new ProductNotFoundException(id);
+        throw new ProductNotFoundException(id.toString());
     }
 
-    public ProductResponse updateProduct(String id, UUID sellerId, ProductUpdateRequest request) {
+    public ProductResponse updateProduct(UUID id, UUID sellerId, ProductUpdateRequest request) {
         Product product = findOwned(id, sellerId);
         if (product.isDeleted()) {
             throw new GoneException("Product already deleted");
@@ -149,7 +149,7 @@ public class ProductService {
         return catalogMapper.toProductResponse(productRepository.save(product));
     }
 
-    public void deleteProduct(String id, UUID sellerId) {
+    public void deleteProduct(UUID id, UUID sellerId) {
         Product product = findOwned(id, sellerId);
         if (product.isDeleted()) {
             throw new GoneException("Product already deleted");
@@ -157,17 +157,17 @@ public class ProductService {
         // Contract: Deal Service GET /internal/deals?productId={id}&active=true (§10.1 of
         // catalog-service.md). Mocked by DealServiceFakeClientImpl outside the prod profile
         // (deal.service.mock.has-active-deal); real client under prod (deal.service.url).
-        if (dealServiceClient.hasActiveDeal(product.getId())) {
+        if (dealServiceClient.hasActiveDeal(product.getId().toString())) {
             throw new ConflictException("Product is tied to an active deal and cannot be deleted");
         }
         product.setDeletedAt(LocalDateTime.now());
         productRepository.save(product);
 
         productDeletedKafkaTemplate.send(PRODUCT_DELETED_TOPIC,
-                new ProductDeletedEvent(product.getId()));
+                new ProductDeletedEvent(product.getId().toString()));
     }
 
-    public ProductResponse restoreProduct(String id, UUID sellerId) {
+    public ProductResponse restoreProduct(UUID id, UUID sellerId) {
         Product product = findOwned(id, sellerId);
         if (!product.isDeleted()) {
             throw new ConflictException("Product is not deleted");
@@ -178,7 +178,7 @@ public class ProductService {
         return catalogMapper.toProductResponse(productRepository.save(product));
     }
 
-    public ProductResponse approveProduct(String id) {
+    public ProductResponse approveProduct(UUID id) {
         Product product = findById(id);
         if (product.getStatus() != ProductStatus.PENDING_APPROVAL) {
             throw new BadRequestException("Only pending products can be approved");
@@ -188,7 +188,7 @@ public class ProductService {
         return catalogMapper.toProductResponse(productRepository.save(product));
     }
 
-    public ProductResponse rejectProduct(String id, String reason) {
+    public ProductResponse rejectProduct(UUID id, String reason) {
         Product product = findById(id);
         if (product.getStatus() != ProductStatus.PENDING_APPROVAL) {
             throw new BadRequestException("Only pending products can be rejected");
@@ -199,7 +199,7 @@ public class ProductService {
     }
 
     public int setSellerProductsInvisible(UUID sellerId) {
-        return productRepository.setAllInvisibleBySellerId(sellerId.toString());
+        return productRepository.setAllInvisibleBySellerId(sellerId);
     }
 
     @Transactional(readOnly = true)
@@ -228,22 +228,22 @@ public class ProductService {
         return toPageResponse(productRepository.findAll(spec, pageable));
     }
 
-    private Product findOwned(String id, UUID sellerId) {
+    private Product findOwned(UUID id, UUID sellerId) {
         Product product = findById(id);
         if (!product.getSellerId().equals(sellerId)) {
-            throw new ProductNotOwnedException(id);
+            throw new ProductNotOwnedException(id.toString());
         }
         return product;
     }
 
-    private Product findById(String id) {
+    private Product findById(UUID id) {
         return productRepository.findById(id)
-                .orElseThrow(() -> new ProductNotFoundException(id));
+                .orElseThrow(() -> new ProductNotFoundException(id.toString()));
     }
 
-    private Category findCategory(String categoryId) {
+    private Category findCategory(UUID categoryId) {
         return categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new NotFoundException("Category", categoryId));
+                .orElseThrow(() -> new NotFoundException("Category", categoryId.toString()));
     }
 
     private Pageable buildPageable(String sort, int page, int limit) {

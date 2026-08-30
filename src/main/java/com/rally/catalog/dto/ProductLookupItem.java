@@ -14,7 +14,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class ProductLookupItem {
 
-    private String id;
+    private UUID id;
     private String name;
     private BigDecimal basePrice;
     private String imageUrl;

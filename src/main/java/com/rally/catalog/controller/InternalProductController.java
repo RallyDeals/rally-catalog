@@ -8,6 +8,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/internal/products")
 public class InternalProductController {
@@ -24,7 +26,7 @@ public class InternalProductController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<DealProductResponse> getDealProductResponse(@PathVariable String id) {
+    public ResponseEntity<DealProductResponse> getDealProductResponse(@PathVariable UUID id) {
         return ResponseEntity.ok(productService.getDealProductResponse(id));
     }
 }

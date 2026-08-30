@@ -4,12 +4,13 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.util.List;
+import java.util.UUID;
 
 @Getter
 @Setter
 public class DealProductResponse {
-    private String id;
-    private String sellerId;
+    private UUID id;
+    private UUID sellerId;
     private String sellerName;
     private String productName;
     private CategoryResponse category;

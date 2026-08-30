@@ -51,7 +51,7 @@ public final class ProductSpecifications {
         return (root, query, cb) -> cb.equal(root.get("visible"), visible);
     }
 
-    public static Specification<Product> categoryIs(String categoryId) {
+    public static Specification<Product> categoryIs(UUID categoryId) {
         return (root, query, cb) -> categoryId == null
                 ? null
                 : cb.equal(root.get("category").get("id"), categoryId);
@@ -98,7 +98,7 @@ public final class ProductSpecifications {
         return (root, query, cb) -> cb.isNotNull(root.get("deletedAt"));
     }
 
-    public static Specification<Product> idIn(Collection<String> ids) {
+    public static Specification<Product> idIn(Collection<UUID> ids) {
         return (root, query, cb) -> root.get("id").in(ids);
     }
 }

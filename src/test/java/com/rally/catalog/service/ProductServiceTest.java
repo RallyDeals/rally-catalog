@@ -75,6 +75,8 @@ class ProductServiceTest {
     private static final UUID BUYER = UUID.fromString("22222222-2222-4222-8222-222222222222");
     private static final UUID ADMIN = UUID.fromString("33333333-3333-4333-8333-333333333333");
     private static final UUID OTHER = UUID.fromString("44444444-4444-4444-8444-444444444444");
+    private static final UUID CAT_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static final UUID PROD_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
     @BeforeEach
     void setUp() {
@@ -86,7 +88,7 @@ class ProductServiceTest {
 
     private Category category() {
         Category category = new Category("Electronics", "Gadgets");
-        category.setId("cat-1");
+        category.setId(CAT_ID);
         return category;
     }
 
@@ -94,7 +96,7 @@ class ProductServiceTest {
         Product product = new Product(
                 SELLER, "Jane Seller", "Headphones", "Noise cancelling", category(),
                 new BigDecimal("79.99"), "https://cdn.example.com/img.jpg");
-        product.setId("prod-1");
+        product.setId(PROD_ID);
         product.setStatus(status);
         product.setCreatedAt(LocalDateTime.now());
         return product;
@@ -102,16 +104,16 @@ class ProductServiceTest {
 
     @Test
     void createProduct_shouldCreatePendingProduct() {
-        when(categoryRepository.findById("cat-1")).thenReturn(Optional.of(category()));
+        when(categoryRepository.findById(CAT_ID)).thenReturn(Optional.of(category()));
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> {
             Product p = invocation.getArgument(0);
-            p.setId("prod-1");
+            p.setId(PROD_ID);
             return p;
         });
 
         ProductRequest request = new ProductRequest();
         request.setName("Headphones");
-        request.setCategoryId("cat-1");
+        request.setCategoryId(CAT_ID);
         request.setBasePrice(new BigDecimal("79.99"));
 
         ProductResponse response = productService.createProduct(SELLER, "Jane Seller", request);
@@ -124,16 +126,16 @@ class ProductServiceTest {
 
     @Test
     void createProduct_shouldPersistSkuVisibilityAndTags() {
-        when(categoryRepository.findById("cat-1")).thenReturn(Optional.of(category()));
+        when(categoryRepository.findById(CAT_ID)).thenReturn(Optional.of(category()));
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> {
             Product p = invocation.getArgument(0);
-            p.setId("prod-1");
+            p.setId(PROD_ID);
             return p;
         });
 
         ProductRequest request = new ProductRequest();
         request.setName("Headphones");
-        request.setCategoryId("cat-1");
+        request.setCategoryId(CAT_ID);
         request.setBasePrice(new BigDecimal("79.99"));
         request.setSku("HP-100-X");
         request.setVisible(false);
@@ -148,12 +150,12 @@ class ProductServiceTest {
 
     @Test
     void createProduct_shouldDefaultToVisible() {
-        when(categoryRepository.findById("cat-1")).thenReturn(Optional.of(category()));
+        when(categoryRepository.findById(CAT_ID)).thenReturn(Optional.of(category()));
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductRequest request = new ProductRequest();
         request.setName("Headphones");
-        request.setCategoryId("cat-1");
+        request.setCategoryId(CAT_ID);
         request.setBasePrice(new BigDecimal("79.99"));
 
         ProductResponse response = productService.createProduct(SELLER, "Jane Seller", request);
@@ -164,7 +166,7 @@ class ProductServiceTest {
     @Test
     void updateProduct_shouldApplySkuVisibilityAndTags() {
         Product approved = product(ProductStatus.APPROVED);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
         when(productRepository.save(any(Product.class))).thenReturn(approved);
 
         ProductUpdateRequest request = new ProductUpdateRequest();
@@ -172,7 +174,7 @@ class ProductServiceTest {
         request.setVisible(false);
         request.setTags(List.of("premium", "noise-cancelling"));
 
-        ProductResponse response = productService.updateProduct("prod-1", SELLER, request);
+        ProductResponse response = productService.updateProduct(PROD_ID, SELLER, request);
 
         assertEquals("HP-PRO-X", response.getSku());
         assertFalse(response.isVisible());
@@ -183,24 +185,25 @@ class ProductServiceTest {
     void updateProduct_shouldNotOverwriteVisibilityWhenNull() {
         Product approved = product(ProductStatus.APPROVED);
         approved.setVisible(false);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
         when(productRepository.save(any(Product.class))).thenReturn(approved);
 
         ProductUpdateRequest request = new ProductUpdateRequest();
         request.setName("Headphones Pro");
 
-        ProductResponse response = productService.updateProduct("prod-1", SELLER, request);
+        ProductResponse response = productService.updateProduct(PROD_ID, SELLER, request);
 
         assertFalse(response.isVisible());
     }
 
     @Test
     void createProduct_shouldThrowWhenCategoryMissing() {
-        when(categoryRepository.findById("missing")).thenReturn(Optional.empty());
+        UUID missingId = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        when(categoryRepository.findById(missingId)).thenReturn(Optional.empty());
 
         ProductRequest request = new ProductRequest();
         request.setName("Headphones");
-        request.setCategoryId("missing");
+        request.setCategoryId(missingId);
         request.setBasePrice(new BigDecimal("79.99"));
 
         assertThrows(NotFoundException.class, () -> productService.createProduct(SELLER, "Jane Seller", request));
@@ -209,47 +212,47 @@ class ProductServiceTest {
     @Test
     void getProduct_shouldHideUnapprovedFromBuyer() {
         Product pending = product(ProductStatus.PENDING_APPROVAL);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(pending));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(pending));
 
-        assertThrows(NotFoundException.class, () -> productService.getProduct("prod-1", Role.BUYER, BUYER));
+        assertThrows(NotFoundException.class, () -> productService.getProduct(PROD_ID, Role.BUYER, BUYER));
     }
 
     @Test
     void getProduct_shouldExposeApprovedToBuyer() {
         Product approved = product(ProductStatus.APPROVED);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
 
-        ProductResponse response = productService.getProduct("prod-1", Role.BUYER, BUYER);
+        ProductResponse response = productService.getProduct(PROD_ID, Role.BUYER, BUYER);
 
-        assertEquals("prod-1", response.getId());
+        assertEquals(PROD_ID, response.getId());
     }
 
     @Test
     void getProduct_shouldHideHiddenApprovedProductFromBuyer() {
         Product approved = product(ProductStatus.APPROVED);
         approved.setVisible(false);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
 
-        assertThrows(NotFoundException.class, () -> productService.getProduct("prod-1", Role.BUYER, BUYER));
+        assertThrows(NotFoundException.class, () -> productService.getProduct(PROD_ID, Role.BUYER, BUYER));
     }
 
     @Test
     void getProduct_shouldExposeHiddenProductToOwnerSeller() {
         Product approved = product(ProductStatus.APPROVED);
         approved.setVisible(false);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
 
-        ProductResponse response = productService.getProduct("prod-1", Role.SELLER, SELLER);
+        ProductResponse response = productService.getProduct(PROD_ID, Role.SELLER, SELLER);
 
-        assertEquals("prod-1", response.getId());
+        assertEquals(PROD_ID, response.getId());
     }
 
     @Test
     void getProduct_shouldExposeOwnProductToSeller() {
         Product rejected = product(ProductStatus.REJECTED);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(rejected));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(rejected));
 
-        ProductResponse response = productService.getProduct("prod-1", Role.SELLER, SELLER);
+        ProductResponse response = productService.getProduct(PROD_ID, Role.SELLER, SELLER);
 
         assertEquals(ProductStatus.REJECTED, response.getStatus());
     }
@@ -257,27 +260,27 @@ class ProductServiceTest {
     @Test
     void getProduct_shouldHideOtherSellersUnapprovedProduct() {
         Product pending = product(ProductStatus.PENDING_APPROVAL);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(pending));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(pending));
 
-        assertThrows(NotFoundException.class, () -> productService.getProduct("prod-1", Role.SELLER, OTHER));
+        assertThrows(NotFoundException.class, () -> productService.getProduct(PROD_ID, Role.SELLER, OTHER));
     }
 
     @Test
     void getProduct_shouldExposeApprovedProductToOtherSeller() {
         Product approved = product(ProductStatus.APPROVED);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
 
-        ProductResponse response = productService.getProduct("prod-1", Role.SELLER, OTHER);
+        ProductResponse response = productService.getProduct(PROD_ID, Role.SELLER, OTHER);
 
-        assertEquals("prod-1", response.getId());
+        assertEquals(PROD_ID, response.getId());
     }
 
     @Test
     void getProduct_shouldExposeAnyToAdmin() {
         Product pending = product(ProductStatus.PENDING_APPROVAL);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(pending));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(pending));
 
-        ProductResponse response = productService.getProduct("prod-1", Role.ADMIN, ADMIN);
+        ProductResponse response = productService.getProduct(PROD_ID, Role.ADMIN, ADMIN);
 
         assertEquals(ProductStatus.PENDING_APPROVAL, response.getStatus());
     }
@@ -285,13 +288,13 @@ class ProductServiceTest {
     @Test
     void updateProduct_shouldApplyPartialUpdate() {
         Product approved = product(ProductStatus.APPROVED);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
         when(productRepository.save(any(Product.class))).thenReturn(approved);
 
         ProductUpdateRequest request = new ProductUpdateRequest();
         request.setName("Headphones Pro");
 
-        ProductResponse response = productService.updateProduct("prod-1", SELLER, request);
+        ProductResponse response = productService.updateProduct(PROD_ID, SELLER, request);
 
         assertEquals("Headphones Pro", response.getName());
         assertEquals(new BigDecimal("79.99"), response.getBasePrice());
@@ -302,13 +305,13 @@ class ProductServiceTest {
     void updateProduct_shouldResetRejectedToPendingApproval() {
         Product rejected = product(ProductStatus.REJECTED);
         rejected.setRejectionReason("Missing info");
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(rejected));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(rejected));
         when(productRepository.save(any(Product.class))).thenReturn(rejected);
 
         ProductUpdateRequest request = new ProductUpdateRequest();
         request.setName("Headphones Pro");
 
-        ProductResponse response = productService.updateProduct("prod-1", SELLER, request);
+        ProductResponse response = productService.updateProduct(PROD_ID, SELLER, request);
 
         assertEquals(ProductStatus.PENDING_APPROVAL, response.getStatus());
         assertEquals(null, response.getRejectionReason());
@@ -317,34 +320,34 @@ class ProductServiceTest {
     @Test
     void updateProduct_shouldRejectNonOwner() {
         Product approved = product(ProductStatus.APPROVED);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
 
         ProductUpdateRequest request = new ProductUpdateRequest();
         request.setName("Hijacked");
 
-        assertThrows(ProductNotOwnedException.class, () -> productService.updateProduct("prod-1", OTHER, request));
+        assertThrows(ProductNotOwnedException.class, () -> productService.updateProduct(PROD_ID, OTHER, request));
     }
 
     @Test
     void updateProduct_shouldRejectDeletedProduct() {
         Product approved = product(ProductStatus.APPROVED);
         approved.setDeletedAt(LocalDateTime.now());
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
 
         ProductUpdateRequest request = new ProductUpdateRequest();
         request.setName("Headphones Pro");
 
-        assertThrows(GoneException.class, () -> productService.updateProduct("prod-1", SELLER, request));
+        assertThrows(GoneException.class, () -> productService.updateProduct(PROD_ID, SELLER, request));
     }
 
     @Test
     void deleteProduct_shouldSoftDelete() {
         Product approved = product(ProductStatus.APPROVED);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
         when(productRepository.save(any(Product.class))).thenReturn(approved);
-        when(dealServiceClient.hasActiveDeal("prod-1")).thenReturn(false);
+        when(dealServiceClient.hasActiveDeal(PROD_ID.toString())).thenReturn(false);
 
-        productService.deleteProduct("prod-1", SELLER);
+        productService.deleteProduct(PROD_ID, SELLER);
 
         assertNotNull(approved.getDeletedAt());
         verify(productRepository).save(approved);
@@ -353,10 +356,10 @@ class ProductServiceTest {
     @Test
     void deleteProduct_shouldRejectWhenTiedToActiveDeal() {
         Product approved = product(ProductStatus.APPROVED);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
-        when(dealServiceClient.hasActiveDeal("prod-1")).thenReturn(true);
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
+        when(dealServiceClient.hasActiveDeal(PROD_ID.toString())).thenReturn(true);
 
-        assertThrows(ConflictException.class, () -> productService.deleteProduct("prod-1", SELLER));
+        assertThrows(ConflictException.class, () -> productService.deleteProduct(PROD_ID, SELLER));
 
         assertNull(approved.getDeletedAt());
         verify(productRepository, never()).save(any(Product.class));
@@ -366,18 +369,18 @@ class ProductServiceTest {
     void deleteProduct_shouldRejectAlreadyDeleted() {
         Product approved = product(ProductStatus.APPROVED);
         approved.setDeletedAt(LocalDateTime.now());
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
 
-        assertThrows(GoneException.class, () -> productService.deleteProduct("prod-1", SELLER));
+        assertThrows(GoneException.class, () -> productService.deleteProduct(PROD_ID, SELLER));
         verify(productRepository, never()).save(any(Product.class));
     }
 
     @Test
     void deleteProduct_shouldRejectNonOwner() {
         Product approved = product(ProductStatus.APPROVED);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
 
-        assertThrows(ProductNotOwnedException.class, () -> productService.deleteProduct("prod-1", OTHER));
+        assertThrows(ProductNotOwnedException.class, () -> productService.deleteProduct(PROD_ID, OTHER));
     }
 
     @Test
@@ -385,10 +388,10 @@ class ProductServiceTest {
         Product approved = product(ProductStatus.APPROVED);
         approved.setDeletedAt(LocalDateTime.now());
         approved.setRejectionReason("removed by seller");
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
         when(productRepository.save(any(Product.class))).thenReturn(approved);
 
-        productService.restoreProduct("prod-1", SELLER);
+        productService.restoreProduct(PROD_ID, SELLER);
 
         assertNull(approved.getDeletedAt());
         assertEquals(ProductStatus.PENDING_APPROVAL, approved.getStatus());
@@ -399,9 +402,9 @@ class ProductServiceTest {
     @Test
     void restoreProduct_shouldRejectWhenNotDeleted() {
         Product approved = product(ProductStatus.APPROVED);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
 
-        assertThrows(ConflictException.class, () -> productService.restoreProduct("prod-1", SELLER));
+        assertThrows(ConflictException.class, () -> productService.restoreProduct(PROD_ID, SELLER));
         verify(productRepository, never()).save(any(Product.class));
     }
 
@@ -409,18 +412,18 @@ class ProductServiceTest {
     void restoreProduct_shouldRejectNonOwner() {
         Product approved = product(ProductStatus.APPROVED);
         approved.setDeletedAt(LocalDateTime.now());
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
 
-        assertThrows(ProductNotOwnedException.class, () -> productService.restoreProduct("prod-1", OTHER));
+        assertThrows(ProductNotOwnedException.class, () -> productService.restoreProduct(PROD_ID, OTHER));
     }
 
     @Test
     void approveProduct_shouldApprovePendingProduct() {
         Product pending = product(ProductStatus.PENDING_APPROVAL);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(pending));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(pending));
         when(productRepository.save(any(Product.class))).thenReturn(pending);
 
-        ProductResponse response = productService.approveProduct("prod-1");
+        ProductResponse response = productService.approveProduct(PROD_ID);
 
         assertEquals(ProductStatus.APPROVED, response.getStatus());
     }
@@ -428,18 +431,18 @@ class ProductServiceTest {
     @Test
     void approveProduct_shouldRejectAlreadyApproved() {
         Product approved = product(ProductStatus.APPROVED);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
 
-        assertThrows(BadRequestException.class, () -> productService.approveProduct("prod-1"));
+        assertThrows(BadRequestException.class, () -> productService.approveProduct(PROD_ID));
     }
 
     @Test
     void rejectProduct_shouldSetReason() {
         Product pending = product(ProductStatus.PENDING_APPROVAL);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(pending));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(pending));
         when(productRepository.save(any(Product.class))).thenReturn(pending);
 
-        ProductResponse response = productService.rejectProduct("prod-1", "Missing info");
+        ProductResponse response = productService.rejectProduct(PROD_ID, "Missing info");
 
         assertEquals(ProductStatus.REJECTED, response.getStatus());
         assertEquals("Missing info", response.getRejectionReason());
@@ -448,9 +451,9 @@ class ProductServiceTest {
     @Test
     void rejectProduct_shouldRejectAlreadyApproved() {
         Product approved = product(ProductStatus.APPROVED);
-        when(productRepository.findById("prod-1")).thenReturn(Optional.of(approved));
+        when(productRepository.findById(PROD_ID)).thenReturn(Optional.of(approved));
 
-        assertThrows(BadRequestException.class, () -> productService.rejectProduct("prod-1", "nope"));
+        assertThrows(BadRequestException.class, () -> productService.rejectProduct(PROD_ID, "nope"));
     }
 
     @Test
@@ -526,12 +529,12 @@ class ProductServiceTest {
         Product approved = product(ProductStatus.APPROVED);
         when(productRepository.findAll(any(Specification.class))).thenReturn(List.of(approved));
 
-        ProductLookupResponse response = internalProductService.lookupProducts(List.of("prod-1", "prod-2"));
+        ProductLookupResponse response = internalProductService.lookupProducts(List.of(PROD_ID, UUID.randomUUID()));
 
         assertEquals(1, response.getFound().size());
-        assertTrue(response.getFound().containsKey("prod-1"));
-        assertEquals("prod-1", response.getFound().get("prod-1").getId());
-        assertEquals(List.of("prod-2"), response.getNotFound());
+        assertTrue(response.getFound().containsKey(PROD_ID));
+        assertEquals(PROD_ID, response.getFound().get(PROD_ID).getId());
+        assertEquals(1, response.getNotFound().size());
     }
 
     @Test
@@ -540,9 +543,9 @@ class ProductServiceTest {
         approved.setImages(List.of("https://cdn.example.com/one.jpg", "https://cdn.example.com/two.jpg"));
         when(productRepository.findAll(any(Specification.class))).thenReturn(List.of(approved));
 
-        ProductLookupResponse response = internalProductService.lookupProducts(List.of("prod-1"));
+        ProductLookupResponse response = internalProductService.lookupProducts(List.of(PROD_ID));
 
-        assertEquals("https://cdn.example.com/one.jpg", response.getFound().get("prod-1").getImageUrl());
+        assertEquals("https://cdn.example.com/one.jpg", response.getFound().get(PROD_ID).getImageUrl());
     }
 
     @Test
@@ -550,9 +553,9 @@ class ProductServiceTest {
         Product approved = product(ProductStatus.APPROVED);
         when(productRepository.findAll(any(Specification.class))).thenReturn(List.of(approved));
 
-        ProductLookupResponse response = internalProductService.lookupProducts(List.of("prod-1"));
+        ProductLookupResponse response = internalProductService.lookupProducts(List.of(PROD_ID));
 
-        assertEquals("https://cdn.example.com/img.jpg", response.getFound().get("prod-1").getImageUrl());
+        assertEquals("https://cdn.example.com/img.jpg", response.getFound().get(PROD_ID).getImageUrl());
     }
 
     @Test
@@ -562,8 +565,8 @@ class ProductServiceTest {
 
     @Test
     void lookupProducts_shouldRejectTooManyIds() {
-        List<String> tooMany = java.util.stream.IntStream.rangeClosed(1, 51)
-                .mapToObj(String::valueOf).toList();
+        List<UUID> tooMany = java.util.stream.IntStream.rangeClosed(1, 51)
+                .mapToObj(i -> UUID.randomUUID()).toList();
 
         assertThrows(BadRequestException.class, () -> internalProductService.lookupProducts(tooMany));
     }

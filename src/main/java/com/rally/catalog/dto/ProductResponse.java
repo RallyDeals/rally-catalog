@@ -13,7 +13,7 @@ import java.util.UUID;
 @Setter
 public class ProductResponse {
 
-    private String id;
+    private UUID id;
     private UUID sellerId;
     private String sellerName;
     private String name;

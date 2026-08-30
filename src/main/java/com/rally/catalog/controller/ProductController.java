@@ -62,7 +62,7 @@ public class ProductController {
     public ResponseEntity<PageResponse<ProductResponse>> browseOrSearch(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String tag,
-            @RequestParam(required = false) String categoryId,
+            @RequestParam(required = false) UUID categoryId,
             @RequestParam(required = false) UUID sellerId,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
@@ -75,7 +75,7 @@ public class ProductController {
 
     @GetMapping("/{id}")
     public ResponseEntity<ProductResponse> getProduct(
-            @PathVariable String id,
+            @PathVariable UUID id,
             @RequestHeader(value = "X-User-Role", required = false) String role,
             @RequestHeader(value = "X-User-Id", required = false) UUID userId) {
         return ResponseEntity.ok(productService.getProduct(id, Role.fromValue(role), userId));
@@ -83,7 +83,7 @@ public class ProductController {
 
     @PatchMapping("/{id}")
     public ResponseEntity<ProductResponse> updateProduct(
-            @PathVariable String id,
+            @PathVariable UUID id,
             @RequestHeader("X-User-Id") UUID sellerId,
             @Valid @RequestBody ProductUpdateRequest request) {
         return ResponseEntity.ok(productService.updateProduct(id, sellerId, request));
@@ -91,7 +91,7 @@ public class ProductController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(
-            @PathVariable String id,
+            @PathVariable UUID id,
             @RequestHeader("X-User-Id") UUID sellerId) {
         productService.deleteProduct(id, sellerId);
         return ResponseEntity.noContent().build();
@@ -99,7 +99,7 @@ public class ProductController {
 
     @PatchMapping("/{id}/restore")
     public ResponseEntity<ProductResponse> restoreProduct(
-            @PathVariable String id,
+            @PathVariable UUID id,
             @RequestHeader("X-User-Id") UUID sellerId) {
         return ResponseEntity.ok(productService.restoreProduct(id, sellerId));
     }
@@ -131,14 +131,14 @@ public class ProductController {
     }
 
     @PatchMapping("/admin/{id}/approve")
-    public ResponseEntity<ProductResponse> approveProduct(@PathVariable String id) {
+    public ResponseEntity<ProductResponse> approveProduct(@PathVariable UUID id) {
         // ADMIN enforcement via AdminRoleFilter — disabled until Auth service exists.
         return ResponseEntity.ok(productService.approveProduct(id));
     }
 
     @PatchMapping("/admin/{id}/reject")
     public ResponseEntity<ProductResponse> rejectProduct(
-            @PathVariable String id,
+            @PathVariable UUID id,
             @RequestBody(required = false) RejectRequest request) {
         // ADMIN enforcement via AdminRoleFilter — disabled until Auth service exists.
         String reason = request == null ? null : request.getReason();

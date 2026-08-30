@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,8 +43,8 @@ public class CategoryService {
     public List<CategoryResponse> listCategories(boolean includeProductsCount) {
         List<CategoryResponse> categories = catalogMapper.toCategoryResponses(categoryRepository.findAll());
         if (includeProductsCount) {
-            Map<String, Long> counts = productRepository.countProductsGroupedByCategory().stream()
-                    .collect(Collectors.toMap(row -> (String) row[0], row -> (Long) row[1]));
+            Map<UUID, Long> counts = productRepository.countProductsGroupedByCategory().stream()
+                    .collect(Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
             categories.forEach(category ->
                     category.setProductsCount(counts.getOrDefault(category.getId(), 0L).intValue()));
         }
@@ -51,11 +52,11 @@ public class CategoryService {
     }
 
     @Transactional(readOnly = true)
-    public CategoryResponse getCategory(String id) {
+    public CategoryResponse getCategory(UUID id) {
         return catalogMapper.toCategoryResponse(findCategory(id));
     }
 
-    public CategoryResponse updateCategory(String id, CategoryRequest request) {
+    public CategoryResponse updateCategory(UUID id, CategoryRequest request) {
         Category category = findCategory(id);
         category.setName(request.getName());
         category.setDescription(request.getDescription());
@@ -63,7 +64,7 @@ public class CategoryService {
         return catalogMapper.toCategoryResponse(categoryRepository.save(category));
     }
 
-    public void deleteCategory(String id) {
+    public void deleteCategory(UUID id) {
         Category category = findCategory(id);
         if (productRepository.countByCategoryId(id) > 0) {
             throw new BadRequestException("Cannot delete a category that has products");
@@ -71,8 +72,8 @@ public class CategoryService {
         categoryRepository.delete(category);
     }
 
-    private Category findCategory(String id) {
+    private Category findCategory(UUID id) {
         return categoryRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Category", id));
+                .orElseThrow(() -> new NotFoundException("Category", id.toString()));
     }
 }

@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.util.List;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -13,5 +14,5 @@ public class ProductLookupRequest {
 
     @NotEmpty(message = "productIds must not be empty")
     @Size(max = 50, message = "At most 50 product IDs per lookup")
-    private List<String> productIds;
+    private List<UUID> productIds;
 }

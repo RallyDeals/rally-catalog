@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -36,6 +37,9 @@ class CategoryServiceTest {
 
     private CategoryService categoryService;
 
+    private static final UUID CAT_1 = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static final UUID CAT_2 = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+
     @BeforeEach
     void setUp() {
         categoryService = new CategoryService(categoryRepository, productRepository, new CatalogMapperImpl());
@@ -44,7 +48,7 @@ class CategoryServiceTest {
     @Test
     void createCategory_shouldSaveAndReturnCategory() {
         Category category = new Category("Electronics", "Gadgets");
-        category.setId("cat-1");
+        category.setId(CAT_1);
         when(categoryRepository.existsByNameIgnoreCase("Electronics")).thenReturn(false);
         when(categoryRepository.save(any(Category.class))).thenReturn(category);
 
@@ -54,7 +58,7 @@ class CategoryServiceTest {
 
         CategoryResponse response = categoryService.createCategory(request);
 
-        assertEquals("cat-1", response.getId());
+        assertEquals(CAT_1, response.getId());
         assertEquals("Electronics", response.getName());
         verify(categoryRepository).save(any(Category.class));
     }
@@ -73,7 +77,7 @@ class CategoryServiceTest {
     @Test
     void listCategories_shouldReturnAllCategories() {
         Category electronics = new Category("Electronics", "Gadgets");
-        electronics.setId("cat-1");
+        electronics.setId(CAT_1);
         when(categoryRepository.findAll()).thenReturn(List.of(electronics));
 
         List<CategoryResponse> result = categoryService.listCategories(false);
@@ -86,43 +90,44 @@ class CategoryServiceTest {
     @Test
     void listCategories_shouldIncludeProductsCountWhenRequested() {
         Category electronics = new Category("Electronics", "Gadgets");
-        electronics.setId("cat-1");
+        electronics.setId(CAT_1);
         Category watches = new Category("Watches", "Timepieces");
-        watches.setId("cat-2");
+        watches.setId(CAT_2);
         when(categoryRepository.findAll()).thenReturn(List.of(electronics, watches));
         List<Object[]> counts = new ArrayList<>();
-        counts.add(new Object[] {"cat-1", 5L});
+        counts.add(new Object[] {CAT_1, 5L});
         when(productRepository.countProductsGroupedByCategory()).thenReturn(counts);
 
         List<CategoryResponse> result = categoryService.listCategories(true);
 
         CategoryResponse electronicsResponse = result.stream()
-                .filter(c -> c.getId().equals("cat-1")).findFirst().orElseThrow();
+                .filter(c -> c.getId().equals(CAT_1)).findFirst().orElseThrow();
         CategoryResponse watchesResponse = result.stream()
-                .filter(c -> c.getId().equals("cat-2")).findFirst().orElseThrow();
+                .filter(c -> c.getId().equals(CAT_2)).findFirst().orElseThrow();
         assertEquals(5, electronicsResponse.getProductsCount());
         assertEquals(0, watchesResponse.getProductsCount());
     }
 
     @Test
     void getCategory_shouldThrowWhenNotFound() {
-        when(categoryRepository.findById("missing")).thenReturn(Optional.empty());
+        UUID missingId = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        when(categoryRepository.findById(missingId)).thenReturn(Optional.empty());
 
-        assertThrows(NotFoundException.class, () -> categoryService.getCategory("missing"));
+        assertThrows(NotFoundException.class, () -> categoryService.getCategory(missingId));
     }
 
     @Test
     void updateCategory_shouldUpdateFields() {
         Category category = new Category("Old", null);
-        category.setId("cat-1");
-        when(categoryRepository.findById("cat-1")).thenReturn(Optional.of(category));
+        category.setId(CAT_1);
+        when(categoryRepository.findById(CAT_1)).thenReturn(Optional.of(category));
         when(categoryRepository.save(category)).thenReturn(category);
 
         CategoryRequest request = new CategoryRequest();
         request.setName("New");
         request.setDescription("Updated");
 
-        CategoryResponse response = categoryService.updateCategory("cat-1", request);
+        CategoryResponse response = categoryService.updateCategory(CAT_1, request);
 
         assertEquals("New", response.getName());
         assertEquals("Updated", response.getDescription());
@@ -131,11 +136,11 @@ class CategoryServiceTest {
     @Test
     void deleteCategory_shouldDeleteWhenNoProducts() {
         Category category = new Category("Electronics", null);
-        category.setId("cat-1");
-        when(categoryRepository.findById("cat-1")).thenReturn(Optional.of(category));
-        when(productRepository.countByCategoryId("cat-1")).thenReturn(0L);
+        category.setId(CAT_1);
+        when(categoryRepository.findById(CAT_1)).thenReturn(Optional.of(category));
+        when(productRepository.countByCategoryId(CAT_1)).thenReturn(0L);
 
-        categoryService.deleteCategory("cat-1");
+        categoryService.deleteCategory(CAT_1);
 
         verify(categoryRepository).delete(category);
     }
@@ -143,11 +148,11 @@ class CategoryServiceTest {
     @Test
     void deleteCategory_shouldRejectWhenCategoryHasProducts() {
         Category category = new Category("Electronics", null);
-        category.setId("cat-1");
-        when(categoryRepository.findById("cat-1")).thenReturn(Optional.of(category));
-        when(productRepository.countByCategoryId("cat-1")).thenReturn(3L);
+        category.setId(CAT_1);
+        when(categoryRepository.findById(CAT_1)).thenReturn(Optional.of(category));
+        when(productRepository.countByCategoryId(CAT_1)).thenReturn(3L);
 
-        assertThrows(BadRequestException.class, () -> categoryService.deleteCategory("cat-1"));
+        assertThrows(BadRequestException.class, () -> categoryService.deleteCategory(CAT_1));
         verify(categoryRepository, never()).delete(any(Category.class));
     }
 }
