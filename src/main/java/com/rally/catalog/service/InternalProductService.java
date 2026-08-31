@@ -3,13 +3,13 @@ package com.rally.catalog.service;
 import com.rally.catalog.dto.DealProductResponse;
 import com.rally.catalog.dto.ProductLookupItem;
 import com.rally.catalog.dto.ProductLookupResponse;
+import com.rally.catalog.dto.SellerSummary;
+import com.rally.catalog.dto.SellerSummaryResponse;
 import com.rally.catalog.entity.Product;
 import com.rally.catalog.mapper.CatalogMapper;
 import com.rally.catalog.repository.ProductRepository;
 import com.rally.catalog.repository.ProductSpecifications;
-import com.rally.common.exceptions.domain.catalog.ProductNotFoundException;
 import com.rally.common.exceptions.shared.BadRequestException;
-import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,10 +32,9 @@ public class InternalProductService {
 
 
     @Transactional
-    public DealProductResponse getDealProductResponse(UUID id) {
-        Product product = productRepository.findById(id)
-                .orElseThrow(() -> new ProductNotFoundException(id.toString()));
-        return catalogMapper.toDealProductResponse(product);
+    public List<DealProductResponse> getDealProductsResponse(List<UUID> ids) {
+        List<Product> products = productRepository.findByIdIn(ids);
+        return products.stream().map(catalogMapper::toDealProductResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)

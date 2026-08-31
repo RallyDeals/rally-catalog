@@ -23,4 +23,6 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
     @Query("UPDATE Product p SET p.visible = false, p.updatedAt = CURRENT_TIMESTAMP " +
            "WHERE p.sellerId = :sellerId AND p.deletedAt IS NULL")
     int setAllInvisibleBySellerId(@Param("sellerId") UUID sellerId);
+
+    List<Product> findByIdIn(List<UUID> ids);
 }
