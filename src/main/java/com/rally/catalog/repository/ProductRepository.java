@@ -25,4 +25,15 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
     int setAllInvisibleBySellerId(@Param("sellerId") UUID sellerId);
 
     List<Product> findByIdIn(List<UUID> ids);
+
+    @Query("""
+                SELECT p.sellerId,
+                       COUNT(p),
+                       SUM(CASE WHEN p.status = ProductStatus.PENDING_APPROVAL THEN 1 ELSE 0 END)
+                FROM Product p
+                WHERE p.sellerId IN :sellerIds
+                  AND p.deletedAt IS NULL
+                GROUP BY p.sellerId
+            """)
+    List<Object[]> getSellerProductsInfo(@Param("sellerIds") List<UUID> sellerIds);
 }

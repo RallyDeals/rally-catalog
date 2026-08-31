@@ -62,4 +62,18 @@ public class InternalProductService {
                 .collect(Collectors.toList()));
         return response;
     }
+
+    public SellerSummaryResponse getSellersInfo(List<String> sellerIds) {
+        List<UUID> ids = sellerIds.stream().map(UUID::fromString).collect(Collectors.toList());
+        List<Object[]> rows = productRepository.getSellerProductsInfo(ids);
+        List<SellerSummary> summaries = rows.stream()
+                .map(row -> SellerSummary.builder()
+                        .sellerId(row[0].toString())
+                        .totalProducts(((Long) row[1]).intValue())
+                        .totalPendingProducts(((Long) row[2]).intValue())
+                        .build())
+                .collect(Collectors.toList());
+
+        return SellerSummaryResponse.builder().sellers(summaries).build();
+    }
 }

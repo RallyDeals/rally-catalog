@@ -32,4 +32,9 @@ public class InternalProductController {
     public ResponseEntity<List<DealProductResponse>> getDealProductResponse(@RequestBody List<UUID> productIds) {
         return ResponseEntity.ok(productService.getDealProductsResponse(productIds));
     }
+
+    @PostMapping("/sellers-summary")
+    public ResponseEntity<SellerSummaryResponse> getSellersSummary(@RequestBody List<String> sellerIds) {
+        return ResponseEntity.ok(productService.getSellersInfo(sellerIds));
+    }
 }
