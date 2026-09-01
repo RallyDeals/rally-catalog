@@ -120,6 +120,8 @@ public class ProductController {
     @GetMapping("/admin")
     public ResponseEntity<PageResponse<ProductResponse>> getAdminProducts(
             @RequestParam(required = false) ProductStatus status,
+            @RequestParam(required = false) UUID sellerId,
+            @RequestParam(required = false) UUID categoryId,
             @RequestParam(defaultValue = "true") boolean includeDeleted,
             @RequestParam(required = false) String sort,
             @RequestParam(defaultValue = "1") int page,
@@ -127,7 +129,7 @@ public class ProductController {
         // ADMIN enforcement via AdminRoleFilter (com.rally.catalog.config) — disabled
         // until the Auth service is implemented. See SecurityConfig.
         return ResponseEntity.ok(productService.listAdminProducts(
-                status, includeDeleted, sort, page, limit));
+                status, sellerId, categoryId, includeDeleted, sort, page, limit));
     }
 
     @PatchMapping("/admin/{id}/approve")

@@ -220,11 +220,13 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> listAdminProducts(
-            ProductStatus status, boolean includeDeleted, String sort, int page, int limit) {
+            ProductStatus status, UUID sellerId, UUID categoryId, boolean includeDeleted, String sort, int page, int limit) {
         Pageable pageable = buildPageable(sort, page, limit);
         Specification<Product> spec = Specification.allOf(
                 ProductSpecifications.statusIs(status),
-                ProductSpecifications.notDeleted(includeDeleted));
+                ProductSpecifications.notDeleted(includeDeleted),
+                ProductSpecifications.categoryIs(categoryId),
+                ProductSpecifications.sellerIs(sellerId));
         return toPageResponse(productRepository.findAll(spec, pageable));
     }
 
