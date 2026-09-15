@@ -39,7 +39,7 @@ rally-catalog/
     ├── main/
     │   ├── java/com/rally/catalog/
     │   │   ├── CatalogServiceApplication.java
-    │   │   ├── config/SecurityConfig.java      # permitAll; AdminRoleFilter (disabled) guards /products/admin/*
+    │   │   ├── config/SecurityConfig.java      # permitAll; AdminRoleFilter (auto-registered) guards /products/admin/*
     │   │   ├── config/KafkaProducerConfig.java # StringSerializer + JSON, correlation interceptor, observation enabled
     │   │   ├── config/rest/                     # RestClientConfig + CorrelationIdRequestInterceptor (outbound REST)
     │   │   ├── controller/                      # CategoryController, ProductController, InternalProductController
@@ -74,9 +74,9 @@ rally-catalog/
 | Buyer browse/search | Done | keyword `q` (LIKE on name/description), `categoryId` / `sellerId` / price filters, `sort` (`createdAt`/`basePrice`/`name`), pagination |
 | Role-based visibility | Done | buyer sees only APPROVED + non-deleted; owner/admin see everything; non-owner `GET /products/{id}` → 404 |
 | `POST /products/lookup` | Done | used by Order Service checkout; `found`/`notFound` split; empty/>50 → 400 |
+| API Gateway integration | Done | `rally-gateway` validates JWTs and injects `X-User-Id` / `X-User-Role` / `X-User-Name`; role/ownership enforced service-side — see [Identity & Gateway](#identity--api-gateway-contract) |
 | Observability & structured logging | Done | correlation-id + HTTP request logging filters, Kafka producer correlation, outbound REST correlation, Micrometer OTel tracing, Logstash/Loki appenders, Prometheus endpoint (see [Logging & Observability](#logging--observability)) |
 | Seed data | Done | 24 real demo products across 6 categories (V2 migration) |
-| API Gateway | **Not built yet** | required for real auth — see [Identity & Gateway](#identity--api-gateway-contract) |
 | Swagger/OpenAPI | Not added | no springdoc dependency |
 
 ---
@@ -114,23 +114,26 @@ Base URL (local Docker): `http://localhost:8083`
 
 ## Identity & API Gateway Contract
 
-The gateway (not yet built) is the single entry point and owns JWT handling:
+The API Gateway (`rally-gateway`, running) is the single entry point and owns JWT
+handling:
 
 1. Client sends `Authorization: Bearer <JWT>` to the **API Gateway**.
-2. Gateway validates the JWT (rally-common `JwtService.parseAndValidate`; JWT is
-   signed HMAC, not encrypted) and extracts `sub` (user id) + `roles`.
-3. Gateway strips the token and injects identity headers downstream:
+2. Gateway validates the JWT with `rally-security` `JwtService.parseAndValidate`
+   (RS256 — signed by the Auth service's RSA private key; the gateway only holds the
+   public key) and extracts `sub` (user id), roles, and username.
+3. Gateway strips the token, removes any client-supplied identity headers, and
+   **injects** its own downstream:
    - `X-User-Id` — JWT `sub`
-   - `X-User-Role` — JWT roles
-4. Catalog never validates tokens itself. `SecurityConfig` is `permitAll` and the
-   rally-common `JwtAuthenticationFilter` is registered **disabled**; role/ownership
+   - `X-User-Role` — JWT roles (comma-joined)
+   - `X-User-Name` — JWT username
+4. Catalog never validates tokens itself. `SecurityConfig` is `permitAll`; role/ownership
    rules are enforced service-side from the injected headers:
-   - `AdminRoleFilter` (written, **disabled** until Auth service exists) guards
-     `/products/admin/*` against non-`ADMIN` callers;
+   - `AdminRoleFilter` (an auto-registered `@Component`) guards `/products/admin/*`
+     against non-`ADMIN` callers → 403;
    - ownership checks (non-owner → 403) run in `ProductService`.
 
-The Postman collection (`postman/rally-catalog.postman_collection.json`) simulates
-the gateway by setting `X-User-Id` / `X-User-Role` directly.
+The Postman collection (`postman/rally-catalog.postman_collection.json`) simulates the
+gateway by setting `X-User-Id` / `X-User-Role` / `X-User-Name` directly.
 
 ---
 
@@ -279,20 +282,19 @@ From `gaps-and-solutions.md` and a spec-vs-implementation review of
 `catalog-service.md` (spec was updated to match the implementation — paths and response
 envelopes in the doc reflect the code):
 
-1. **Auth service / API Gateway not built** — no real JWT login flow; without it, anyone
-   can set `X-User-Id` / `X-User-Role`. Build auth + gateway, or enable the
-   `JwtAuthenticationFilter`.
-2. **Admin endpoints not yet role-protected** — `AdminRoleFilter` exists but is
-   **disabled** (commented `@Component` / bean in `SecurityConfig`). Uncomment it once
-   the Auth service makes `X-User-Role` trustworthy.
-3. **`DELETE /products/{id}` → 409 "tied to active deal"** not implemented — currently
-   only soft-delete (204) + re-delete (410). Requires a Deal Service contract
-   (sync `GET /internal/deals?productId=...&active=true` or deal events) — see
-   `catalog-service.md` §10.1.
-4. **Schema deviation** — `id`/`seller_id`/`category_id` use `VARCHAR(36)` (String
+1. **Deal-service client contract mismatch** — `DELETE /products/{id}` does check the
+   "tied to an active deal" rule (409 via `dealServiceClient.hasActiveDeal`), but the
+   real client (`DealServiceClientImpl`, `@Profile("prod")`) calls
+   `GET /internal/deals?productId={id}&active=true` and maps
+   `{ "hasActiveDeal": ... }`, whereas Deal Service actually exposes
+   `GET /internal/deals/product/{productId}/has-active-deals` returning
+   `{ "productId": ..., "hasActiveDeal": ... }`. Outside the `prod` profile the mock
+   (`deal.service.mock.has-active-deal`) answers instead. Align the two contracts so the
+   prod client works end-to-end — see `catalog-service.md` §10.1.
+2. **Schema deviation** — `id`/`seller_id`/`category_id` use `VARCHAR(36)` (String
    ids with `GenerationType.UUID`) instead of the native `uuid` type in the spec's
    SQL. Invisible at the API level.
-5. **Search is LIKE-based, not Postgres full-text** — all queries are built with
+3. **Search is LIKE-based, not Postgres full-text** — all queries are built with
    the JPA Criteria API (`ProductSpecifications`), so `q` matches `name`/`description`
    via `LIKE` instead of `to_tsvector` (documented as the agreed behavior in
    `catalog-service.md` §7.1). The `idx_products_fts` GIN index in V1 is unused; swap
