@@ -44,6 +44,10 @@ spring:
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    template:
+      observation-enabled: true
+    listener:
+      observation-enabled: true
     consumer:
       group-id: catalog-service
       auto-offset-reset: earliest
@@ -51,9 +55,45 @@ spring:
 
 server:
   port: 8083
-  
+
+loki:
+  url: ${LOKI_URL:http://localhost:3100/loki/api/v1/push}
+
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: ${MANAGEMENT_HEALTH_SHOW_DETAILS:always}
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0
+    baggage:
+      remote-fields: X-Correlation-Id
+      correlation:
+        fields: X-Correlation-Id
+      tag-fields: X-Correlation-Id
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+logging:
+  level:
+    root: ${LOGGING_LEVEL_ROOT:INFO}
+    com.rally.catalog: ${LOGGING_LEVEL_RALLY:INFO}
+    org.hibernate: WARN
+    org.hibernate.SQL: OFF
+    org.hibernate.type.descriptor.sql.BasicBinder: OFF
+    org.apache.kafka: WARN
+    org.apache.kafka.clients.producer: OFF
+    org.apache.kafka.clients.consumer: OFF
+    org.springframework.kafka: WARN
+    org.springframework: WARN
+    org.springframework.boot: WARN
+    org.flywaydb: WARN
