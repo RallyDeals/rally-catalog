@@ -2,6 +2,7 @@ package com.rally.catalog.config;
 
 import com.rally.catalog.event.ProductCreatedEvent;
 import com.rally.catalog.event.ProductDeletedEvent;
+import com.rally.catalog.messaging.KafkaProducerCorrelationInterceptor;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +30,8 @@ public class KafkaProducerConfig {
         properties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
         properties.put(JsonSerializer.ADD_TYPE_INFO_HEADERS, false);
+        properties.put(ProducerConfig.INTERCEPTOR_CLASSES_CONFIG,
+                KafkaProducerCorrelationInterceptor.class.getName());
         return properties;
     }
 
@@ -39,7 +42,10 @@ public class KafkaProducerConfig {
 
     @Bean
     public KafkaTemplate<String, ProductCreatedEvent> productCreatedKafkaTemplate() {
-        return new KafkaTemplate<>(productCreatedProducerFactory());
+        KafkaTemplate<String, ProductCreatedEvent> template =
+                new KafkaTemplate<>(productCreatedProducerFactory());
+        template.setObservationEnabled(true);
+        return template;
     }
 
     @Bean
@@ -49,6 +55,9 @@ public class KafkaProducerConfig {
 
     @Bean
     public KafkaTemplate<String, ProductDeletedEvent> productDeletedKafkaTemplate() {
-        return new KafkaTemplate<>(productDeletedProducerFactory());
+        KafkaTemplate<String, ProductDeletedEvent> template =
+                new KafkaTemplate<>(productDeletedProducerFactory());
+        template.setObservationEnabled(true);
+        return template;
     }
 }
