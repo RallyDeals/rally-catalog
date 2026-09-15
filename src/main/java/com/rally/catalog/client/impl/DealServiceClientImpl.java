@@ -25,12 +25,12 @@ public class DealServiceClientImpl implements DealServiceClient {
 
     @Override
     public boolean hasActiveDeal(String productId) {
-        String url = dealServiceUrl + "/internal/deals?productId={productId}&active=true";
+        String url = dealServiceUrl + "/internal/deals/product/{productId}/has-active-deals";
 
         try {
             ResponseEntity<DealActiveResponse> response = restTemplate.getForEntity(
                     url, DealActiveResponse.class, productId);
-            return response.getBody() != null && response.getBody().hasActiveDeal();
+            return response.getBody() != null && response.getBody().hasActiveDeals();
         } catch (ResourceAccessException resourceAccessException) {
             throw new ServiceUnavailableException("Deal service is unavailable");
         } catch (HttpServerErrorException serverErrorException) {

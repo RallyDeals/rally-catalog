@@ -222,10 +222,14 @@ envelopes in the doc reflect the code):
 2. **Admin endpoints not yet role-protected** — `AdminRoleFilter` exists but is
    **disabled** (commented `@Component` / bean in `SecurityConfig`). Uncomment it once
    the Auth service makes `X-User-Role` trustworthy.
-3. **`DELETE /products/{id}` → 409 "tied to active deal"** not implemented — currently
-   only soft-delete (204) + re-delete (410). Requires a Deal Service contract
-   (sync `GET /internal/deals?productId=...&active=true` or deal events) — see
-   `catalog-service.md` §10.1.
+3. **Deal-service client contract** — `DELETE /products/{id}` checks the "tied to an
+   active deal" rule (409 via `dealServiceClient.hasActiveDeal`). The real client
+   (`DealServiceClientImpl`, `@Profile("prod")`) calls
+   `GET /internal/deals/product/{productId}/has-active-deals` and maps
+   `{ "hasActiveDeals": true|false }` — aligned with Deal Service's
+   `InternalDealController.hasActiveDeals`. Outside the `prod` profile the mock
+   (`deal.service.mock.has-active-deal`) answers instead. Contract covered by
+   `DealServiceClientImplTest`.
 4. **Schema deviation** — `id`/`seller_id`/`category_id` use `VARCHAR(36)` (String
    ids with `GenerationType.UUID`) instead of the native `uuid` type in the spec's
    SQL. Invisible at the API level.

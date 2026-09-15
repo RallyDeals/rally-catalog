@@ -154,9 +154,10 @@ public class ProductService {
         if (product.isDeleted()) {
             throw new GoneException("Product already deleted");
         }
-        // Contract: Deal Service GET /internal/deals?productId={id}&active=true (§10.1 of
-        // catalog-service.md). Mocked by DealServiceFakeClientImpl outside the prod profile
-        // (deal.service.mock.has-active-deal); real client under prod (deal.service.url).
+        // Contract: Deal Service GET /internal/deals/product/{productId}/has-active-deals
+        // (§10.1 of catalog-service.md). Mocked by DealServiceFakeClientImpl outside the
+        // prod profile (deal.service.mock.has-active-deal); real client under prod
+        // (deal.service.url).
         if (dealServiceClient.hasActiveDeal(product.getId().toString())) {
             throw new ConflictException("Product is tied to an active deal and cannot be deleted");
         }
