@@ -23,11 +23,7 @@
 
     <repositories>
         <repository>
-            <id>central</id>
-            <url>https://repo.maven.apache.org/maven2</url>
-        </repository>
-        <repository>
-            <id>github</id>
+            <id>github-common</id>
             <url>https://maven.pkg.github.com/RallyDeals/rally-common</url>
         </repository>
     </repositories>
