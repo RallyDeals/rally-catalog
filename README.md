@@ -20,6 +20,9 @@ what is still needed.
 - **Lombok** — DTO/entity boilerplate
 - **MapStruct** — compile-time entity → DTO mapping (`CatalogMapper`, same setup as order-service)
 - **rally-common** — shared `BaseException` hierarchy + `JwtService`
+- **Micrometer Tracing (OpenTelemetry)** — W3C `traceparent` propagation on HTTP/Kafka + OTLP export
+- **logback-spring.xml** — context-aware logging: plain-text console (local/dev), Logstash JSON console (prod), rolling file, Loki appender
+- **Correlation-ID plumbing** — `X-Correlation-Id` propagated across inbound HTTP, outbound REST, and Kafka (mirrors `rally-order` / `rally-payment`)
 - **H2** (test scope) + JUnit 5 / Mockito for unit tests
 
 ---
@@ -37,15 +40,22 @@ rally-catalog/
     │   ├── java/com/rally/catalog/
     │   │   ├── CatalogServiceApplication.java
     │   │   ├── config/SecurityConfig.java      # permitAll; AdminRoleFilter (disabled) guards /products/admin/*
-    │   │   ├── controller/                      # CategoryController, ProductController
-    │   │   ├── dto/                             # request/response DTOs (PageResponse, ...)
-    │   │   ├── entity/                          # Category, Product, ProductStatus
+    │   │   ├── config/KafkaProducerConfig.java # StringSerializer + JSON, correlation interceptor, observation enabled
+    │   │   ├── config/rest/                     # RestClientConfig + CorrelationIdRequestInterceptor (outbound REST)
+    │   │   ├── controller/                      # CategoryController, ProductController, InternalProductController
+    │   │   ├── dto/                             # request/response DTOs (PageResponse, SellerSummary, ...)
+    │   │   ├── entity/                          # Category, Product, ProductStatus, Role
+    │   │   ├── event/                           # ProductCreatedEvent, ProductDeletedEvent
     │   │   ├── exception/GoneException.java     # 410 for soft-deleted product re-delete
+    │   │   ├── filter/                          # CorrelationIdFilter + HttpRequestLoggingFilter (inbound HTTP)
     │   │   ├── mapper/CatalogMapper.java        # MapStruct entity ↔ DTO mappers
+    │   │   ├── messaging/                       # KafkaProducerCorrelationInterceptor (stamps X-Correlation-Id)
+    │   │   │   └── contract/CatalogMessageHeaders.java
     │   │   ├── repository/                      # JPA repos + ProductSpecifications (Criteria API, no SQL strings)
     │   │   └── service/                         # ProductService, CategoryService (business rules)
     │   └── resources/
     │       ├── application.yml
+    │       ├── logback-spring.xml              # console (plain/JSON), rolling file + Loki appender
     │       └── db/migration/
     │           ├── V1__create_catalog_schema.sql
     │           └── V2__seed_catalog_data.sql    # 24 DummyJSON products / 6 categories
@@ -64,6 +74,7 @@ rally-catalog/
 | Buyer browse/search | Done | keyword `q` (LIKE on name/description), `categoryId` / `sellerId` / price filters, `sort` (`createdAt`/`basePrice`/`name`), pagination |
 | Role-based visibility | Done | buyer sees only APPROVED + non-deleted; owner/admin see everything; non-owner `GET /products/{id}` → 404 |
 | `POST /products/lookup` | Done | used by Order Service checkout; `found`/`notFound` split; empty/>50 → 400 |
+| Observability & structured logging | Done | correlation-id + HTTP request logging filters, Kafka producer correlation, outbound REST correlation, Micrometer OTel tracing, Logstash/Loki appenders, Prometheus endpoint (see [Logging & Observability](#logging--observability)) |
 | Seed data | Done | 24 real demo products across 6 categories (V2 migration) |
 | API Gateway | **Not built yet** | required for real auth — see [Identity & Gateway](#identity--api-gateway-contract) |
 | Swagger/OpenAPI | Not added | no springdoc dependency |
@@ -120,6 +131,53 @@ The gateway (not yet built) is the single entry point and owns JWT handling:
 
 The Postman collection (`postman/rally-catalog.postman_collection.json`) simulates
 the gateway by setting `X-User-Id` / `X-User-Role` directly.
+
+---
+
+## Logging & Observability
+
+Implemented to match `rally-order` / `rally-payment` (branch `feature/catalog-logging`).
+
+### Correlation IDs
+
+| Direction | Mechanism |
+|---|---|
+| Inbound HTTP | `filter/CorrelationIdFilter` — reads `X-Correlation-Id` (generates a UUID if absent), puts it in the SLF4J MDC **and** Micrometer baggage, echoes it on the response |
+| Outbound REST | `config/rest/CorrelationIdRequestInterceptor` — stamps `X-Correlation-Id` from MDC on every external call (e.g. `DealServiceClient`) and logs call duration |
+| Kafka (producer) | `messaging/KafkaProducerCorrelationInterceptor` — a Kafka `ProducerInterceptor` registered on both producer factories that copies the MDC correlation id into each record's `X-Correlation-Id` header |
+
+### Request logging
+
+`filter/HttpRequestLoggingFilter` (lowest precedence) logs `HTTP <METHOD> <uri> completed with status <n> in <ms>` for every request. `/actuator`, swagger/api-docs, and `/uploads` paths are skipped as noisy.
+
+### Distributed tracing
+
+- Micrometer Tracing with the OpenTelemetry bridge — `management.tracing.*`
+- W3C `traceparent` is auto-propagated on outbound Kafka records (`KafkaTemplate.setObservationEnabled(true)` + `spring.kafka.template.observation-enabled`) so spans chain across services
+- `X-Correlation-Id` is registered as remote baggage so it shows on spans and in the MDC
+- Traces exported via OTLP (`management.otlp.tracing.endpoint`, default `http://localhost:4318/v1/traces`) — e.g. Jaeger / OTel collector
+
+### Log backends (`logback-spring.xml`)
+
+| Profile | Console | Rolling file | Loki |
+|---|---|---|---|
+| local / dev | plain text with `traceId`/`spanId` in the MDC pattern | `logs/catalog-service.log` (Logstash JSON) | yes |
+| prod | Logstash JSON | `logs/archived/catalog-service-*.log` (10MB each, 30 days, 1GB cap) | yes |
+
+- Rolling file + Loki use `net.logstash.logback.encoder` and `com.github.loki4j` (batch 200 / 5s)
+- Loki pushes to `loki.url`; the `LOKI` appender labels log stream `app = rally-catalog` plus `traceId` / `spanId` / `correlationId` as structured metadata
+- Prometheus metrics exposed at `/actuator/prometheus` (`micrometer-registry-prometheus`)
+
+### Configurable levels
+
+`application.yml` pins framework noise (`org.hibernate`, `org.apache.kafka`, `org.springframework.kafka`, `org.springframework`, `org.flywaydb`) to WARN / selected OFF, and routes everything through:
+
+| Var | Default | Purpose |
+|---|---|---|
+| `LOGGING_LEVEL_ROOT` | `INFO` | root level |
+| `LOGGING_LEVEL_RALLY` | `INFO` | `com.rally.catalog` business level |
+| `LOKI_URL` | `http://localhost:3100/loki/api/v1/push` | Loki push endpoint |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318/v1/traces` | OTLP traces endpoint |
 
 ---
 
@@ -186,6 +244,11 @@ rally:
 The `rally.jwt.secret` is required because `rally-common` auto-configures a
 `JwtService` bean at startup (it is not used for request auth yet). In production,
 override via the `JWT_SECRET` env var — same value on every service.
+
+Observability is configured via `management.tracing.*`, `management.otlp.tracing.*`,
+`loki.url`, and `logging.level.*` (see [Logging & Observability](#logging--observability)).
+The `loki.url` default targets the Loki instance shipped by `rally-infrastructure`
+(`docker/local/docker-compose.yml`).
 
 ### 3. Run the app locally (IntelliJ or Maven)
 
