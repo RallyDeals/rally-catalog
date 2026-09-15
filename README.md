@@ -282,16 +282,21 @@ From `gaps-and-solutions.md` and a spec-vs-implementation review of
 `catalog-service.md` (spec was updated to match the implementation — paths and response
 envelopes in the doc reflect the code):
 
-1. **Deal-service client contract mismatch** — `DELETE /products/{id}` does check the
-   "tied to an active deal" rule (409 via `dealServiceClient.hasActiveDeal`), but the
-   real client (`DealServiceClientImpl`, `@Profile("prod")`) calls
-   `GET /internal/deals?productId={id}&active=true` and maps
-   `{ "hasActiveDeal": ... }`, whereas Deal Service actually exposes
-   `GET /internal/deals/product/{productId}/has-active-deals` returning
-   `{ "productId": ..., "hasActiveDeal": ... }`. Outside the `prod` profile the mock
-   (`deal.service.mock.has-active-deal`) answers instead. Align the two contracts so the
-   prod client works end-to-end — see `catalog-service.md` §10.1.
-2. **Schema deviation** — `id`/`seller_id`/`category_id` use `VARCHAR(36)` (String
+1. **Auth service / API Gateway not built** — no real JWT login flow; without it, anyone
+   can set `X-User-Id` / `X-User-Role`. Build auth + gateway, or enable the
+   `JwtAuthenticationFilter`.
+2. **Admin endpoints not yet role-protected** — `AdminRoleFilter` exists but is
+   **disabled** (commented `@Component` / bean in `SecurityConfig`). Uncomment it once
+   the Auth service makes `X-User-Role` trustworthy.
+3. **Deal-service client contract** — `DELETE /products/{id}` checks the "tied to an
+   active deal" rule (409 via `dealServiceClient.hasActiveDeal`). The real client
+   (`DealServiceClientImpl`, `@Profile("prod")`) calls
+   `GET /internal/deals/product/{productId}/has-active-deals` and maps
+   `{ "hasActiveDeals": true|false }` — aligned with Deal Service's
+   `InternalDealController.hasActiveDeals`. Outside the `prod` profile the mock
+   (`deal.service.mock.has-active-deal`) answers instead. Contract covered by
+   `DealServiceClientImplTest`.
+4. **Schema deviation** — `id`/`seller_id`/`category_id` use `VARCHAR(36)` (String
    ids with `GenerationType.UUID`) instead of the native `uuid` type in the spec's
    SQL. Invisible at the API level.
 3. **Search is LIKE-based, not Postgres full-text** — all queries are built with
