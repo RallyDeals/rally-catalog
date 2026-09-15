@@ -8,11 +8,19 @@ import org.springframework.web.client.RestTemplate;
 @Configuration
 public class RestClientConfig {
 
+    private final CorrelationIdRequestInterceptor correlationIdRequestInterceptor;
+
+    public RestClientConfig(CorrelationIdRequestInterceptor correlationIdRequestInterceptor) {
+        this.correlationIdRequestInterceptor = correlationIdRequestInterceptor;
+    }
+
     @Bean
     public RestTemplate restTemplate() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(2000);
         factory.setReadTimeout(5000);
-        return new RestTemplate(factory);
+        RestTemplate restTemplate = new RestTemplate(factory);
+        restTemplate.getInterceptors().add(correlationIdRequestInterceptor);
+        return restTemplate;
     }
 }
