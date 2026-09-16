@@ -117,10 +117,10 @@ public class ProductService {
     @Transactional(readOnly = true)
     public ProductResponse getProduct(UUID id, Role viewerRole, UUID viewerId) {
         Product product = findById(id);
-        if (Role.ADMIN.name().equalsIgnoreCase(viewerRole.name())) {
+        if (viewerRole != null && Role.ADMIN.name().equalsIgnoreCase(viewerRole.name())) {
             return catalogMapper.toProductResponse(product);
         }
-        if (Role.SELLER.name().equalsIgnoreCase(viewerRole.name()) && viewerId != null
+        if (viewerRole != null && Role.SELLER.name().equalsIgnoreCase(viewerRole.name())
                 && product.getSellerId().equals(viewerId)) {
             return catalogMapper.toProductResponse(product);
         }
